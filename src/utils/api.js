@@ -1,20 +1,22 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = '/api';
 
-// Define the request function first
-const request = async (endpoint, options = {}) => {
+// Helper function to get auth headers
+const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
-  
-  const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    ...options,
+  return {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
   };
+};
 
+// Generic API request function
+const apiRequest = async (endpoint, options = {}) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: getAuthHeaders(),
+    });
+
     const data = await response.json();
 
     if (!response.ok) {
@@ -23,62 +25,185 @@ const request = async (endpoint, options = {}) => {
 
     return data;
   } catch (error) {
+    console.error('API Error:', error);
     throw error;
   }
 };
 
-// Now define the api object
-const api = {
-  request,
-
-  // Auth
-  login: (credentials) => request('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  }),
-
-  getMe: () => request('/auth/me'),
-
-  // Clients
-  getClients: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    return request(`/clients?${queryString}`);
+// Auth API calls
+export const authAPI = {
+  login: async (credentials) => {
+    return apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials)
+    });
   },
 
-  createClient: (clientData) => request('/clients', {
-    method: 'POST',
-    body: JSON.stringify(clientData),
-  }),
-
-  updateClient: (id, clientData) => request(`/clients/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(clientData),
-  }),
-
-  getClientById: (id) => request(`/clients/${id}`),
-
-  // Tasks
-  getTasks: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    return request(`/tasks?${queryString}`);
+  register: async (userData) => {
+    return apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
   },
 
-  createTask: (taskData) => request('/tasks', {
-    method: 'POST',
-    body: JSON.stringify(taskData),
-  }),
-
-  updateTask: (id, taskData) => request(`/tasks/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(taskData),
-  }),
-
-  // Reports
-  getDashboardStats: () => request('/reports/dashboard'),
-  getAnalytics: (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    return request(`/reports/analytics?${queryString}`);
-  },
+  getMe: async () => {
+    return apiRequest('/auth/me');
+  }
 };
 
-export default api;
+// Client API calls
+export const clientAPI = {
+  getClients: async (params = {}) => {
+    return apiRequest(`/clients${params ? `?${new URLSearchParams(params)}` : ''}`);
+  },
+
+  getClientById: async (id) => {
+    return apiRequest(`/clients/${id}`);
+  },
+
+  getUniqueCountries: async () => {
+    return apiRequest('/clients/countries');
+  },
+
+  getAvailableAgents: async () => {
+    return apiRequest('/clients/agents');
+  },
+
+  createClient: async (clientData) => {
+    return apiRequest('/clients', {
+      method: 'POST',
+      body: JSON.stringify(clientData)
+    });
+  },
+
+  updateClient: async (id, clientData) => {
+    return apiRequest(`/clients/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(clientData)
+    });
+  },
+
+  deleteClient: async (id) => {
+    return apiRequest(`/clients/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  assignClients: async (clientIds, agentId) => {
+    return apiRequest('/clients/assign', {
+      method: 'PUT',
+      body: JSON.stringify({ clientIds, agentId })
+    });
+  },
+
+  exportClients: async (format = 'csv') => {
+    const response = await fetch('/api/clients/export?format=' + format, {
+      headers: getAuthHeaders(),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || 'Export failed');
+    }
+    
+    if (format === 'csv') {
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'clients.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return { message: 'Export successful' };
+    } else {
+      return response.json();
+    }
+  },
+
+  importClients: async (clientsData) => {
+    return apiRequest('/clients/import', {
+      method: 'POST',
+      body: JSON.stringify({ clients: clientsData })
+    });
+  }
+};
+
+// Task API calls
+export const taskAPI = {
+  getTasks: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/tasks${queryString ? `?${queryString}` : ''}`);
+  },
+
+  getTaskById: async (id) => {
+    return apiRequest(`/tasks/${id}`);
+  },
+
+  createTask: async (taskData) => {
+    return apiRequest('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(taskData)
+    });
+  },
+
+  updateTask: async (id, taskData) => {
+    return apiRequest(`/tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(taskData)
+    });
+  },
+
+  deleteTask: async (id) => {
+    return apiRequest(`/tasks/${id}`, {
+      method: 'DELETE'
+    });
+  }
+};
+
+// Reports API calls
+export const reportsAPI = {
+  getDashboardStats: async () => {
+    return apiRequest('/reports/dashboard');
+  },
+
+  getAnalytics: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/reports/analytics${queryString ? `?${queryString}` : ''}`);
+  },
+
+  getUserStats: async () => {
+    return apiRequest('/reports/users');
+  }
+};
+
+// User API calls
+export const userAPI = {
+  getUsers: async () => {
+    return apiRequest('/users');
+  },
+
+  updateProfile: async (userData) => {
+    return apiRequest('/users/profile', {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  changePassword: async (passwordData) => {
+    return apiRequest('/users/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(passwordData)
+    });
+  }
+};
+
+// Export default for convenience
+export default {
+  auth: authAPI,
+  clients: clientAPI,
+  tasks: taskAPI,
+  reports: reportsAPI,
+  users: userAPI
+};

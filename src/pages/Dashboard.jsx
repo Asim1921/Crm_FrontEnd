@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { reportsAPI } from '../utils/api';
 import { 
   Users, 
   Settings, 
@@ -15,49 +16,59 @@ import PageHeader from '../components/PageHeader';
 const Dashboard = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState({
-    totalClients: 4,
-    activeAgents: 1,
-    pendingTasks: 2,
-    ftdThisMonth: 1
+    totalClients: { value: 0, change: '0%' },
+    activeAgents: { value: 0, change: '0' },
+    pendingTasks: { value: 0, overdue: 0 },
+    ftdThisMonth: { value: 0, change: '0%' }
   });
-  const [recentClients, setRecentClients] = useState([
-    {
-      _id: '1',
-      firstName: 'Michael',
-      lastName: 'Johnson',
-      country: 'United States',
-      phone: '+1 (555) 123-4567',
-      status: 'New Lead',
-      assignedAgent: 'Sarah Wilson'
-    },
-    {
-      _id: '2',
-      firstName: 'David',
-      lastName: 'Brown',
-      country: 'Australia',
-      phone: '+61 2 9876 5432',
-      status: 'FTD',
-      assignedAgent: 'Sarah Wilson'
-    },
-    {
-      _id: '3',
-      firstName: 'Emma',
-      lastName: 'Martinez',
-      country: 'Canada',
-      phone: '+1 (416) 555-0123',
-      status: 'Call Again',
-      assignedAgent: 'Sarah Wilson'
-    },
-    {
-      _id: '4',
-      firstName: 'Lisa',
-      lastName: 'Garcia',
-      country: 'United Kingdom',
-      phone: '+44 20 7946 0958',
-      status: 'No Answer',
-      assignedAgent: 'Sarah Wilson'
-    }
-  ]);
+  const [recentClients, setRecentClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const data = await reportsAPI.getDashboardStats();
+        setStats(data);
+        setRecentClients(data.recentClients || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError('Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex-1 bg-gray-50">
+        <PageHeader title="Dashboard" />
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 bg-gray-50">
+        <PageHeader title="Dashboard" />
+        <div className="p-6">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 bg-gray-50">
@@ -71,8 +82,10 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Clients</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalClients}</p>
-                <p className="text-xs text-green-600">+0% from last month</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalClients.value}</p>
+                <p className={`text-xs ${stats.totalClients.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.totalClients.change} from last month
+                </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Users className="w-6 h-6 text-blue-600" />
@@ -84,8 +97,8 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Agents</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeAgents}</p>
-                <p className="text-xs text-green-600">+3 new this week</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.activeAgents.value}</p>
+                <p className="text-xs text-green-600">{stats.activeAgents.change}</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <Settings className="w-6 h-6 text-green-600" />
@@ -97,8 +110,8 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pending Tasks</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingTasks}</p>
-                <p className="text-xs text-gray-600">0 overdue</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.pendingTasks.value}</p>
+                <p className="text-xs text-gray-600">{stats.pendingTasks.overdue} overdue</p>
               </div>
               <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <ClipboardList className="w-6 h-6 text-orange-600" />
@@ -110,8 +123,10 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">FTD This Month</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.ftdThisMonth}</p>
-                <p className="text-xs text-green-600">+0% conversion</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.ftdThisMonth.value}</p>
+                <p className={`text-xs ${stats.ftdThisMonth.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.ftdThisMonth.change} conversion
+                </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-purple-600" />
@@ -167,7 +182,9 @@ const Dashboard = () => {
                           {client.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.assignedAgent}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
                           <button className="text-blue-600 hover:text-blue-900">
@@ -194,34 +211,23 @@ const Dashboard = () => {
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-orange-500 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-700">Call Again</span>
+                {stats.leadStatusOverview && stats.leadStatusOverview.map((status) => (
+                  <div key={status._id} className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className={`w-3 h-3 rounded-full mr-3 ${
+                        status._id === 'New Lead' ? 'bg-green-500' :
+                        status._id === 'FTD' ? 'bg-blue-500' :
+                        status._id === 'Call Again' ? 'bg-orange-500' :
+                        status._id === 'No Answer' ? 'bg-red-500' :
+                        status._id === 'Not Interested' ? 'bg-gray-500' :
+                        status._id === 'Hang Up' ? 'bg-purple-500' :
+                        'bg-gray-400'
+                      }`}></div>
+                      <span className="text-sm text-gray-700">{status._id}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">{status.count}</span>
                   </div>
-                  <span className="text-sm font-medium text-gray-900">1</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-700">New Lead</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">1</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-700">FTD</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">1</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 bg-red-500 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-700">No Answer</span>
-                  </div>
-                  <span className="text-sm font-medium text-gray-900">1</span>
-                </div>
+                ))}
               </div>
             </div>
 
