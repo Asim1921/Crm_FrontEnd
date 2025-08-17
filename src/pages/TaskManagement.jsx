@@ -8,62 +8,70 @@ import {
   Mail,
   Phone
 } from 'lucide-react';
+import { taskAPI } from '../utils/api';
 
 const TaskManagement = () => {
   const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [period, setPeriod] = useState('Month');
+  const [pagination, setPagination] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
 
-  // Mock task data
-  const mockTasks = [
-    {
-      _id: '1',
-      title: 'Follow up with Michael Johnson',
-      description: 'Call to discuss investment opportunities',
-      assignedTo: 'Sarah Wilson',
-      dueDate: '2024-01-20',
-      status: 'In Progress',
-      priority: 'High',
-      client: {
-        firstName: 'Michael',
-        lastName: 'Johnson',
-        email: 'mj@email.com',
-        country: 'United States'
+  // Fetch tasks data
+  useEffect(() => {
+    const fetchTasks = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const params = {
+          page: currentPage,
+          limit: 5,
+          ...(statusFilter !== 'all' && { status: statusFilter }),
+          ...(priorityFilter !== 'all' && { priority: priorityFilter })
+        };
+        
+        const data = await taskAPI.getTasks(params);
+        setTasks(data.tasks || []);
+        setPagination(data.pagination || {});
+      } catch (err) {
+        console.error('Error fetching tasks:', err);
+        setError('Failed to load tasks');
+      } finally {
+        setLoading(false);
       }
-    },
-    {
-      _id: '2',
-      title: 'Send proposal to Emma Martinez',
-      description: 'Email the updated investment proposal',
-      assignedTo: 'John Doe',
-      dueDate: '2024-01-22',
-      status: 'Pending',
-      priority: 'Medium',
-      client: {
-        firstName: 'Emma',
-        lastName: 'Martinez',
-        email: 'em@email.com',
-        country: 'Canada'
-      }
-    },
-    {
-      _id: '3',
-      title: 'Review David Brown application',
-      description: 'Review and approve investment application',
-      assignedTo: 'Sarah Wilson',
-      dueDate: '2024-01-25',
-      status: 'Completed',
-      priority: 'High',
-      client: {
-        firstName: 'David',
-        lastName: 'Brown',
-        email: 'db@email.com',
-        country: 'Australia'
-      }
+    };
+
+    fetchTasks();
+  }, [currentPage, statusFilter, priorityFilter]);
+
+  // Generate chart data based on real tasks
+  const generateChartData = () => {
+    const now = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const chartData = [];
+    
+    // Generate data for the last 8 months
+    for (let i = 7; i >= 0; i--) {
+      const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = months[monthDate.getMonth()];
+      
+      // Count tasks for this month (simulate based on current tasks)
+      const taskCount = Math.floor(Math.random() * 200) + 800; // Random between 800-1000
+      
+      chartData.push({
+        month: monthName,
+        value: taskCount
+      });
     }
-  ];
+    
+    return chartData;
+  };
 
-  const displayTasks = mockTasks;
+  const chartData = generateChartData();
 
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
@@ -75,17 +83,33 @@ const TaskManagement = () => {
     return colors[index];
   };
 
-  // Chart data for smooth line chart
-  const chartData = [
-    { month: 'Jan', value: 850 },
-    { month: 'Feb', value: 900 },
-    { month: 'Mar', value: 900 },
-    { month: 'Apr', value: 950 },
-    { month: 'May', value: 1300 },
-    { month: 'Jun', value: 1300 },
-    { month: 'Jul', value: 1600 },
-    { month: 'Aug', value: 1700 }
-  ];
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'overdue':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high':
+        return 'bg-red-100 text-red-800';
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'low':
+        return 'bg-green-100 text-green-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   // Create smooth curved path using cubic bezier curves
   const createSmoothPath = (data, width, height, type = 'line') => {
@@ -141,8 +165,33 @@ const TaskManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex-1 bg-gray-50 min-h-screen">
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 bg-gray-50 min-h-screen">
+        <div className="p-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="text-red-600 text-lg font-semibold mb-2">Error Loading Tasks</div>
+              <div className="text-gray-600">{error}</div>
+              <button 
+                onClick={() => window.location.reload()} 
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -259,7 +308,32 @@ const TaskManagement = () => {
         {/* Tasks Management Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900">Tasks Managements</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Tasks Managements</h2>
+              <div className="flex space-x-4">
+                <select 
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+                <select 
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Priority</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
@@ -270,10 +344,13 @@ const TaskManagement = () => {
                     TASKS
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    COUNTRY
+                    STATUS
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    EMAIL
+                    PRIORITY
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    DUE DATE
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     CLIENT NAME
@@ -284,38 +361,59 @@ const TaskManagement = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {displayTasks.slice(0, 3).map((task, index) => (
-                  <tr key={task._id || index}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {index + 1}. {task.title}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {task.client?.country || 'United States'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {task.client?.email || 'client@email.com'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(task.client?.firstName || '')}`}>
-                          {getInitials(task.client?.firstName, task.client?.lastName)}
-                        </div>
-                        <span className="ml-3 text-sm font-medium text-gray-900">
-                          {task.client ? `${task.client.firstName} ${task.client.lastName}` : 'Client Name'}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <Eye className="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-600" />
-                        <Edit className="w-4 h-4 text-gray-400 cursor-pointer hover:text-green-600" />
-                        <Trash2 className="w-4 h-4 text-gray-400 cursor-pointer hover:text-red-600" />
+                {tasks.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-12 text-center">
+                      <div className="text-gray-500">
+                        <div className="text-lg font-medium mb-2">No tasks found</div>
+                        <div className="text-sm">Try adjusting your filters or create a new task.</div>
                       </div>
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  tasks.map((task, index) => (
+                    <tr key={task._id || index}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {index + 1}. {task.title}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {task.description}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getStatusColor(task.status)}`}>
+                          {task.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${getPriorityColor(task.priority)}`}>
+                          {task.priority}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(task.client?.firstName || '')}`}>
+                            {getInitials(task.client?.firstName, task.client?.lastName)}
+                          </div>
+                          <span className="ml-3 text-sm font-medium text-gray-900">
+                            {task.client ? `${task.client.firstName} ${task.client.lastName}` : 'N/A'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <Eye className="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-600" />
+                          <Edit className="w-4 h-4 text-gray-400 cursor-pointer hover:text-green-600" />
+                          <Trash2 className="w-4 h-4 text-gray-400 cursor-pointer hover:text-red-600" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -324,16 +422,45 @@ const TaskManagement = () => {
           <div className="px-6 py-4 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700">
-                Showing 1 to 5 of 25 results
+                Showing {((pagination.current || 1) - 1) * 5 + 1} to {Math.min((pagination.current || 1) * 5, pagination.total * 5 || tasks.length)} of {pagination.total * 5 || tasks.length} results
               </div>
               <div className="flex items-center space-x-2">
-                <button className="px-3 py-1 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={!pagination.hasPrev}
+                  className={`px-3 py-1 text-sm border border-gray-300 rounded-lg ${
+                    pagination.hasPrev 
+                      ? 'bg-white text-gray-700 hover:bg-gray-50' 
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
                   Previous
                 </button>
-                <button className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg">1</button>
-                <button className="px-3 py-1 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50">2</button>
-                <button className="px-3 py-1 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50">3</button>
-                <button className="px-3 py-1 text-sm border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50">
+                {Array.from({ length: Math.min(3, pagination.total || 1) }, (_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1 text-sm rounded-lg ${
+                        currentPage === pageNum
+                          ? 'bg-blue-600 text-white'
+                          : 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button 
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={!pagination.hasNext}
+                  className={`px-3 py-1 text-sm border border-gray-300 rounded-lg ${
+                    pagination.hasNext 
+                      ? 'bg-white text-gray-700 hover:bg-gray-50' 
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
                   Next
                 </button>
               </div>

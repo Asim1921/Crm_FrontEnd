@@ -180,14 +180,25 @@ export const reportsAPI = {
 
 // User API calls
 export const userAPI = {
-  getUsers: async () => {
-    return apiRequest('/users');
+  getProfile: async () => {
+    return apiRequest('/users/profile');
+  },
+
+  getUserStats: async () => {
+    return apiRequest('/users/stats');
   },
 
   updateProfile: async (userData) => {
     return apiRequest('/users/profile', {
       method: 'PUT',
       body: JSON.stringify(userData)
+    });
+  },
+
+  uploadProfilePicture: async (profilePicture) => {
+    return apiRequest('/users/profile-picture', {
+      method: 'POST',
+      body: JSON.stringify({ profilePicture })
     });
   },
 
@@ -199,11 +210,53 @@ export const userAPI = {
   }
 };
 
+// Communication API calls
+export const communicationAPI = {
+  getStats: async () => {
+    return apiRequest('/communications/stats');
+  },
+
+  getAnalytics: async () => {
+    return apiRequest('/communications/analytics');
+  },
+
+  getActiveAgents: async () => {
+    return apiRequest('/communications/agents');
+  },
+
+  getHistory: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/communications/history${queryString ? `?${queryString}` : ''}`);
+  },
+
+  initiateCall: async (callData) => {
+    return apiRequest('/communications/call', {
+      method: 'POST',
+      body: JSON.stringify(callData)
+    });
+  },
+
+  sendMessage: async (messageData) => {
+    return apiRequest('/communications/message', {
+      method: 'POST',
+      body: JSON.stringify(messageData)
+    });
+  },
+
+  sendEmail: async (emailData) => {
+    return apiRequest('/communications/email', {
+      method: 'POST',
+      body: JSON.stringify(emailData)
+    });
+  }
+};
+
 // Export default for convenience
 export default {
   auth: authAPI,
   clients: clientAPI,
   tasks: taskAPI,
   reports: reportsAPI,
-  users: userAPI
+  users: userAPI,
+  communications: communicationAPI
 };

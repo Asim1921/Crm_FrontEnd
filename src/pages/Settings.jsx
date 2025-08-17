@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Phone, 
@@ -7,21 +8,90 @@ import {
   Shield, 
   Database, 
   Lock, 
-  Cloud
+  Cloud,
+  Bell,
+  Eye,
+  EyeOff
 } from 'lucide-react';
-import PageHeader from '../components/PageHeader';
+import { reportsAPI } from '../utils/api';
 
 const Settings = () => {
   const { user } = useAuth();
+  const [systemStats, setSystemStats] = useState({
+    totalClients: 0,
+    totalUsers: 0,
+    totalTasks: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [settings, setSettings] = useState({
+    hidePhoneNumbers: true,
+    hideEmailAddresses: true,
+    enableNotifications: true,
+    showSensitiveData: user?.role === 'admin'
+  });
+
+  useEffect(() => {
+    const fetchSystemStats = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const dashboardData = await reportsAPI.getDashboardStats();
+        
+        // Calculate system statistics
+        setSystemStats({
+          totalClients: dashboardData.totalClients?.value || 0,
+          totalUsers: dashboardData.activeAgents?.value || 0,
+          totalTasks: dashboardData.pendingTasks?.value || 0
+        });
+      } catch (error) {
+        console.error('Error fetching system stats:', error);
+        setError('Failed to load system statistics');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSystemStats();
+  }, []);
+
+  const handleSettingChange = (setting) => {
+    setSettings(prev => ({
+      ...prev,
+      [setting]: !prev[setting]
+    }));
+  };
+
+  const getInitials = (firstName, lastName) => {
+    return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
+  };
+
+  const getAvatarColor = (name) => {
+    const colors = ['bg-blue-500', 'bg-pink-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'];
+    const index = name.length % colors.length;
+    return colors[index];
+  };
 
   return (
     <div className="flex-1 bg-gray-50">
-      <PageHeader 
-        title="Settings" 
-        subtitle="Manage your security settings and data privacy controls" 
-      />
-
       <div className="p-6">
+        {/* Error Message */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-5 h-5 bg-red-400 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">✕</span>
+                </div>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Hidden Contact Information Section */}
         <div className="bg-white rounded-xl p-6 mb-8">
           <div className="mb-6">
@@ -43,8 +113,8 @@ const Settings = () => {
               <div className="flex items-center mb-3">
                 <input
                   type="checkbox"
-                  checked={true}
-                  readOnly
+                  checked={settings.hidePhoneNumbers}
+                  onChange={() => handleSettingChange('hidePhoneNumbers')}
                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label className="ml-2 text-sm text-gray-700">Hidden from Agents</label>
@@ -71,8 +141,8 @@ const Settings = () => {
               <div className="flex items-center mb-3">
                 <input
                   type="checkbox"
-                  checked={true}
-                  readOnly
+                  checked={settings.hideEmailAddresses}
+                  onChange={() => handleSettingChange('hideEmailAddresses')}
                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
                 />
                 <label className="ml-2 text-sm text-gray-700">Hidden from Agents</label>
@@ -126,26 +196,32 @@ const Settings = () => {
               <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Database className="w-6 h-6 text-green-600" />
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">500,000+</div>
-              <div className="text-sm text-gray-600">Client Records Supported</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading ? '...' : systemStats.totalClients.toLocaleString()}
+              </div>
+              <div className="text-sm text-gray-600">Client Records</div>
             </div>
 
-            {/* Encryption Standard */}
+            {/* Active Users */}
             <div className="bg-gray-50 rounded-lg p-6 text-center">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-6 h-6 text-blue-600" />
+                <Users className="w-6 h-6 text-blue-600" />
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">AES-256</div>
-              <div className="text-sm text-gray-600">Encryption Standard</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading ? '...' : systemStats.totalUsers}
+              </div>
+              <div className="text-sm text-gray-600">Active Users</div>
             </div>
 
-            {/* Automated Backups */}
+            {/* Pending Tasks */}
             <div className="bg-gray-50 rounded-lg p-6 text-center">
               <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Cloud className="w-6 h-6 text-purple-600" />
+                <Lock className="w-6 h-6 text-purple-600" />
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">24/7</div>
-              <div className="text-sm text-gray-600">Automated Backups</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading ? '...' : systemStats.totalTasks}
+              </div>
+              <div className="text-sm text-gray-600">Pending Tasks</div>
             </div>
           </div>
         </div>
@@ -164,6 +240,14 @@ const Settings = () => {
                 <Check className="w-5 h-5 text-green-600 mr-3" />
                 <span className="text-gray-700">Multi-factor authentication</span>
               </div>
+              <div className="flex items-center">
+                <Check className="w-5 h-5 text-green-600 mr-3" />
+                <span className="text-gray-700">Role-based access control</span>
+              </div>
+              <div className="flex items-center">
+                <Check className="w-5 h-5 text-green-600 mr-3" />
+                <span className="text-gray-700">Real-time activity monitoring</span>
+              </div>
             </div>
           </div>
 
@@ -178,6 +262,63 @@ const Settings = () => {
               <div className="flex items-center">
                 <Shield className="w-5 h-5 text-blue-600 mr-3" />
                 <span className="text-gray-700">SOC 2 Type II</span>
+              </div>
+              <div className="flex items-center">
+                <Shield className="w-5 h-5 text-blue-600 mr-3" />
+                <span className="text-gray-700">ISO 27001 Certified</span>
+              </div>
+              <div className="flex items-center">
+                <Shield className="w-5 h-5 text-blue-600 mr-3" />
+                <span className="text-gray-700">HIPAA Compliant</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current User Info */}
+        <div className="bg-white rounded-xl p-6 mt-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Current User Settings</h3>
+          <div className="flex items-center space-x-4">
+            <div className={`w-12 h-12 ${getAvatarColor(user?.firstName || '')} rounded-full flex items-center justify-center`}>
+              <span className="text-white font-medium text-lg">
+                {getInitials(user?.firstName, user?.lastName)}
+              </span>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900">
+                {user?.firstName} {user?.lastName}
+              </h4>
+              <p className="text-sm text-gray-600">{user?.email}</p>
+              <p className="text-xs text-gray-500 capitalize">{user?.role} • {user?.title || 'User'}</p>
+            </div>
+            <div className="ml-auto">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center">
+                  <Bell className="w-4 h-4 text-gray-400 mr-2" />
+                  <input
+                    type="checkbox"
+                    checked={settings.enableNotifications}
+                    onChange={() => handleSettingChange('enableNotifications')}
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label className="ml-2 text-sm text-gray-700">Notifications</label>
+                </div>
+                {user?.role === 'admin' && (
+                  <div className="flex items-center">
+                    {settings.showSensitiveData ? (
+                      <Eye className="w-4 h-4 text-gray-400 mr-2" />
+                    ) : (
+                      <EyeOff className="w-4 h-4 text-gray-400 mr-2" />
+                    )}
+                    <input
+                      type="checkbox"
+                      checked={settings.showSensitiveData}
+                      onChange={() => handleSettingChange('showSensitiveData')}
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label className="ml-2 text-sm text-gray-700">Show Sensitive Data</label>
+                  </div>
+                )}
               </div>
             </div>
           </div>

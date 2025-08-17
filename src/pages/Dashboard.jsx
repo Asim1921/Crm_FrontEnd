@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { reportsAPI } from '../utils/api';
+import { useNavigate } from 'react-router-dom';
+import { reportsAPI, clientAPI, communicationAPI } from '../utils/api';
 import { 
   Users, 
   Settings, 
@@ -9,12 +10,24 @@ import {
   TrendingUp,
   Phone,
   MessageCircle,
-  MoreHorizontal
+  MoreHorizontal,
+  Mail,
+  Edit,
+  Trash2,
+  Download,
+  Plus,
+  FileText,
+  BarChart3,
+  X,
+  User,
+  Calendar,
+  MapPin,
+  Tag
 } from 'lucide-react';
-import PageHeader from '../components/PageHeader';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalClients: { value: 0, change: '0%' },
     activeAgents: { value: 0, change: '0' },
@@ -24,6 +37,19 @@ const Dashboard = () => {
   const [recentClients, setRecentClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [showMenu, setShowMenu] = useState(null);
+  
+  // Modal states
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [availableAgents, setAvailableAgents] = useState([]);
+  const [selectedAgent, setSelectedAgent] = useState('');
+  const [editForm, setEditForm] = useState({});
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -44,10 +70,172 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
+  // Filter clients based on status
+  const filteredClients = recentClients.filter(client => {
+    if (statusFilter === 'all') return true;
+    return client.status === statusFilter;
+  });
+
+  // Handle status card clicks
+  const handleStatusCardClick = (status) => {
+    setStatusFilter(status);
+  };
+
+  // Handle call action
+  const handleCall = (client) => {
+    if (client.phone) {
+      window.open(`tel:${client.phone}`, '_self');
+    } else {
+      alert('No phone number available for this client');
+    }
+  };
+
+  // Handle message action - Fixed to use email
+  const handleMessage = (client) => {
+    if (client.email) {
+      window.open(`mailto:${client.email}?subject=CRM Follow-up`, '_self');
+    } else {
+      alert('No email address available for this client');
+    }
+  };
+
+  // Handle export action
+  const handleExport = async () => {
+    try {
+      await clientAPI.exportClients('csv');
+      alert('Export completed successfully!');
+    } catch (error) {
+      alert('Export failed: ' + error.message);
+    }
+  };
+
+  // Handle three dots menu actions
+  const handleMenuAction = async (action, client) => {
+    setShowMenu(null);
+    setSelectedClient(client);
+    
+    switch (action) {
+      case 'view':
+        setShowDetailsModal(true);
+        break;
+      case 'edit':
+        setEditForm({
+          firstName: client.firstName,
+          lastName: client.lastName,
+          email: client.email,
+          phone: client.phone,
+          country: client.country,
+          status: client.status,
+          value: client.value || 0
+        });
+        setShowEditModal(true);
+        break;
+      case 'assign':
+        try {
+          const agents = await clientAPI.getAvailableAgents();
+          setAvailableAgents(agents);
+          setSelectedAgent(client.assignedAgent?._id || '');
+          setShowAssignModal(true);
+        } catch (error) {
+          alert('Failed to load agents: ' + error.message);
+        }
+        break;
+      case 'delete':
+        setShowDeleteModal(true);
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Handle edit client
+  const handleEditClient = async () => {
+    try {
+      setActionLoading(true);
+      await clientAPI.updateClient(selectedClient._id, editForm);
+      alert('Client updated successfully!');
+      setShowEditModal(false);
+      // Refresh dashboard data
+      const data = await reportsAPI.getDashboardStats();
+      setStats(data);
+      setRecentClients(data.recentClients || []);
+    } catch (error) {
+      alert('Failed to update client: ' + error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle assign agent
+  const handleAssignAgent = async () => {
+    try {
+      setActionLoading(true);
+      await clientAPI.assignClients([selectedClient._id], selectedAgent);
+      alert('Agent assigned successfully!');
+      setShowAssignModal(false);
+      // Refresh dashboard data
+      const data = await reportsAPI.getDashboardStats();
+      setStats(data);
+      setRecentClients(data.recentClients || []);
+    } catch (error) {
+      alert('Failed to assign agent: ' + error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle delete client
+  const handleDeleteClient = async () => {
+    try {
+      setActionLoading(true);
+      await clientAPI.deleteClient(selectedClient._id);
+      alert('Client deleted successfully!');
+      setShowDeleteModal(false);
+      // Refresh dashboard data
+      const data = await reportsAPI.getDashboardStats();
+      setStats(data);
+      setRecentClients(data.recentClients || []);
+    } catch (error) {
+      alert('Failed to delete client: ' + error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Handle quick actions
+  const handleQuickAction = (action) => {
+    switch (action) {
+      case 'add-client':
+        navigate('/clients', { state: { showAddModal: true } });
+        break;
+      case 'create-task':
+        navigate('/tasks', { state: { showAddModal: true } });
+        break;
+      case 'import-data':
+        navigate('/clients', { state: { showImportModal: true } });
+        break;
+      case 'view-reports':
+        navigate('/reports');
+        break;
+      default:
+        break;
+    }
+  };
+
+  // Close all modals
+  const closeAllModals = () => {
+    setShowDetailsModal(false);
+    setShowEditModal(false);
+    setShowAssignModal(false);
+    setShowDeleteModal(false);
+    setSelectedClient(null);
+    setEditForm({});
+    setSelectedAgent('');
+  };
+
   if (loading) {
     return (
       <div className="flex-1 bg-gray-50">
-        <PageHeader title="Dashboard" />
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -60,7 +248,6 @@ const Dashboard = () => {
   if (error) {
     return (
       <div className="flex-1 bg-gray-50">
-        <PageHeader title="Dashboard" />
         <div className="p-6">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-800">{error}</p>
@@ -72,13 +259,15 @@ const Dashboard = () => {
 
   return (
     <div className="flex-1 bg-gray-50">
-      <PageHeader title="Dashboard" />
       
       {/* Main Content */}
       <div className="p-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div 
+            className="bg-white rounded-xl p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleStatusCardClick('all')}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Clients</p>
@@ -93,15 +282,38 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div 
+            className="bg-white rounded-xl p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleStatusCardClick('New Lead')}
+          >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Agents</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeAgents.value}</p>
-                <p className="text-xs text-green-600">{stats.activeAgents.change}</p>
+                <p className="text-sm font-medium text-gray-600">New Leads</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.leadStatusOverview?.find(s => s._id === 'New Lead')?.count || 0}
+                </p>
+                <p className="text-xs text-green-600">Active leads</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Settings className="w-6 h-6 text-green-600" />
+                <Plus className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div 
+            className="bg-white rounded-xl p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleStatusCardClick('FTD')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">FTD</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.ftdThisMonth.value}</p>
+                <p className={`text-xs ${stats.ftdThisMonth.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {stats.ftdThisMonth.change} conversion
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-purple-600" />
               </div>
             </div>
           </div>
@@ -118,21 +330,6 @@ const Dashboard = () => {
               </div>
             </div>
           </div>
-
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">FTD This Month</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.ftdThisMonth.value}</p>
-                <p className={`text-xs ${stats.ftdThisMonth.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {stats.ftdThisMonth.change} conversion
-                </p>
-              </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-purple-600" />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Charts and Tables */}
@@ -143,10 +340,40 @@ const Dashboard = () => {
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-900">Recent Clients</h2>
                 <div className="flex items-center space-x-2">
-                  <button className="px-3 py-1 text-sm bg-blue-100 text-blue-600 rounded-lg">All</button>
-                  <button className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">New Leads</button>
-                  <button className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">FTD</button>
-                  <button className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center">
+                  <button 
+                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                      statusFilter === 'all' 
+                        ? 'bg-blue-100 text-blue-600' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    All
+                  </button>
+                  <button 
+                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                      statusFilter === 'New Lead' 
+                        ? 'bg-green-100 text-green-600' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setStatusFilter('New Lead')}
+                  >
+                    New Leads
+                  </button>
+                  <button 
+                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                      statusFilter === 'FTD' 
+                        ? 'bg-purple-100 text-purple-600' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setStatusFilter('FTD')}
+                  >
+                    FTD
+                  </button>
+                  <button 
+                    className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
+                    onClick={handleExport}
+                  >
                     <TrendingUp className="w-4 h-4 mr-1" />
                     Export
                   </button>
@@ -165,41 +392,97 @@ const Dashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {recentClients.map((client) => (
-                    <tr key={client._id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.country}</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{client.firstName} {client.lastName}</div>
-                        <div className="text-sm text-gray-500">{client.phone}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          client.status === 'New Lead' ? 'bg-green-100 text-green-800' :
-                          client.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
-                          client.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {client.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex items-center space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <Phone className="w-4 h-4" />
-                          </button>
-                          <button className="text-green-600 hover:text-green-900">
-                            <MessageCircle className="w-4 h-4" />
-                          </button>
-                          <button className="text-gray-600 hover:text-gray-900">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </button>
-                        </div>
+                  {filteredClients.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                        No clients found for the selected filter
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredClients.map((client) => (
+                      <tr key={client._id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.country}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{client.firstName} {client.lastName}</div>
+                          <div className="text-sm text-gray-500">{client.phone}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            client.status === 'New Lead' ? 'bg-green-100 text-green-800' :
+                            client.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
+                            client.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {client.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2">
+                            <button 
+                              className="text-blue-600 hover:text-blue-900 transition-colors"
+                              onClick={() => handleCall(client)}
+                              title="Call client"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </button>
+                            <button 
+                              className="text-green-600 hover:text-green-900 transition-colors"
+                              onClick={() => handleMessage(client)}
+                              title="Send email"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </button>
+                            <div className="relative">
+                              <button 
+                                className="text-gray-600 hover:text-gray-900 transition-colors"
+                                onClick={() => setShowMenu(showMenu === client._id ? null : client._id)}
+                                title="More options"
+                              >
+                                <MoreHorizontal className="w-4 h-4" />
+                              </button>
+                              {showMenu === client._id && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                                  <div className="py-1">
+                                    <button
+                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      onClick={() => handleMenuAction('view', client)}
+                                    >
+                                      <FileText className="w-4 h-4 mr-2" />
+                                      View Details
+                                    </button>
+                                    <button
+                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      onClick={() => handleMenuAction('edit', client)}
+                                    >
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit Client
+                                    </button>
+                                    <button
+                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                      onClick={() => handleMenuAction('assign', client)}
+                                    >
+                                      <Users className="w-4 h-4 mr-2" />
+                                      Assign Agent
+                                    </button>
+                                    <button
+                                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                      onClick={() => handleMenuAction('delete', client)}
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -235,16 +518,32 @@ const Dashboard = () => {
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
               <div className="space-y-3">
-                <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                <button 
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center"
+                  onClick={() => handleQuickAction('add-client')}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
                   Add New Client
                 </button>
-                <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                <button 
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center"
+                  onClick={() => handleQuickAction('create-task')}
+                >
+                  <ClipboardList className="w-4 h-4 mr-2" />
                   Create Task
                 </button>
-                <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                <button 
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center"
+                  onClick={() => handleQuickAction('import-data')}
+                >
+                  <Download className="w-4 h-4 mr-2" />
                   Import Data
                 </button>
-                <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+                <button 
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors flex items-center"
+                  onClick={() => handleQuickAction('view-reports')}
+                >
+                  <BarChart3 className="w-4 h-4 mr-2" />
                   View Reports
                 </button>
               </div>
@@ -260,6 +559,289 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Click outside to close menu */}
+      {showMenu && (
+        <div 
+          className="fixed inset-0 z-0" 
+          onClick={() => setShowMenu(null)}
+        />
+      )}
+
+      {/* Client Details Modal */}
+      {showDetailsModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Client Details</h2>
+              <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedClient.firstName} {selectedClient.lastName}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedClient.email}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedClient.phone}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Country</label>
+                  <p className="mt-1 text-sm text-gray-900">{selectedClient.country}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full mt-1 ${
+                    selectedClient.status === 'New Lead' ? 'bg-green-100 text-green-800' :
+                    selectedClient.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
+                    selectedClient.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedClient.status}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Assigned Agent</label>
+                  <p className="mt-1 text-sm text-gray-900">
+                    {selectedClient.assignedAgent ? `${selectedClient.assignedAgent.firstName} ${selectedClient.assignedAgent.lastName}` : 'Unassigned'}
+                  </p>
+                </div>
+                {selectedClient.value && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Value</label>
+                    <p className="mt-1 text-sm text-gray-900">${selectedClient.value.toLocaleString()}</p>
+                  </div>
+                )}
+                {selectedClient.lastContact && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Last Contact</label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {new Date(selectedClient.lastContact).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {selectedClient.notes && selectedClient.notes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                  <div className="bg-gray-50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                    {selectedClient.notes.map((note, index) => (
+                      <div key={index} className="text-sm text-gray-700 mb-2 last:mb-0">
+                        <p className="font-medium">{note.content}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {note.createdBy?.firstName} {note.createdBy?.lastName} - {new Date(note.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={closeAllModals}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Modal */}
+      {showEditModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Edit Client</h2>
+              <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">First Name</label>
+                <input
+                  type="text"
+                  value={editForm.firstName || ''}
+                  onChange={(e) => setEditForm({...editForm, firstName: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                <input
+                  type="text"
+                  value={editForm.lastName || ''}
+                  onChange={(e) => setEditForm({...editForm, lastName: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  type="email"
+                  value={editForm.email || ''}
+                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Phone</label>
+                <input
+                  type="text"
+                  value={editForm.phone || ''}
+                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Country</label>
+                <input
+                  type="text"
+                  value={editForm.country || ''}
+                  onChange={(e) => setEditForm({...editForm, country: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Status</label>
+                <select
+                  value={editForm.status || ''}
+                  onChange={(e) => setEditForm({...editForm, status: e.target.value})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="New Lead">New Lead</option>
+                  <option value="Call Again">Call Again</option>
+                  <option value="FTD">FTD</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="Not Interested">Not Interested</option>
+                  <option value="Hang Up">Hang Up</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Value</label>
+                <input
+                  type="number"
+                  value={editForm.value || 0}
+                  onChange={(e) => setEditForm({...editForm, value: parseFloat(e.target.value) || 0})}
+                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={closeAllModals}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEditClient}
+                disabled={actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign Agent Modal */}
+      {showAssignModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Assign Agent</h2>
+              <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Assigning: <span className="font-medium">{selectedClient.firstName} {selectedClient.lastName}</span>
+              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Select Agent</label>
+              <select
+                value={selectedAgent}
+                onChange={(e) => setSelectedAgent(e.target.value)}
+                className="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">Unassigned</option>
+                {availableAgents.map((agent) => (
+                  <option key={agent._id} value={agent._id}>
+                    {agent.firstName} {agent.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeAllModals}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAssignAgent}
+                disabled={actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Assigning...' : 'Assign Agent'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Client Modal */}
+      {showDeleteModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Delete Client</h2>
+              <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-sm text-gray-600 mb-4">
+                Are you sure you want to delete <span className="font-medium">{selectedClient.firstName} {selectedClient.lastName}</span>?
+              </p>
+              <p className="text-xs text-red-600">
+                This action cannot be undone. All client data will be permanently deleted.
+              </p>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeAllModals}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteClient}
+                disabled={actionLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Deleting...' : 'Delete Client'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

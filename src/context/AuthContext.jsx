@@ -20,6 +20,11 @@ const authReducer = (state, action) => {
         isAuthenticated: true,
         loading: false
       };
+    case 'UPDATE_USER':
+      return {
+        ...state,
+        user: action.payload
+      };
     case 'LOGIN_FAIL':
     case 'LOGOUT':
       localStorage.removeItem('token');
@@ -112,6 +117,10 @@ export const AuthProvider = ({ children }) => {
     dispatch({ type: 'LOGOUT' });
   };
 
+  const updateUser = (userData) => {
+    dispatch({ type: 'UPDATE_USER', payload: userData });
+  };
+
   return (
     <AuthContext.Provider value={{
       user: state.user,
@@ -119,7 +128,8 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: state.isAuthenticated,
       loading: state.loading,
       login,
-      logout
+      logout,
+      updateUser
     }}>
       {children}
     </AuthContext.Provider>
