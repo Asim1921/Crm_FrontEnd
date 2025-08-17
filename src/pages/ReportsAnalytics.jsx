@@ -6,7 +6,8 @@ import {
   CheckCircle, 
   DollarSign,
   Eye,
-  Edit
+  Edit,
+  X
 } from 'lucide-react';
 import { reportsAPI } from '../utils/api';
 
@@ -16,6 +17,19 @@ const ReportsAnalytics = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Modal states
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [editClient, setEditClient] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    country: '',
+    status: ''
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -102,6 +116,56 @@ const ReportsAnalytics = () => {
     const colors = ['bg-blue-500', 'bg-pink-500', 'bg-green-500', 'bg-yellow-500', 'bg-purple-500'];
     const index = name.length % colors.length;
     return colors[index];
+  };
+
+  // Handle view client
+  const handleViewClient = (client) => {
+    setSelectedClient(client);
+    setShowViewModal(true);
+  };
+
+  // Handle edit client
+  const handleEditClient = (client) => {
+    setSelectedClient(client);
+    setEditClient({
+      firstName: client.firstName || '',
+      lastName: client.lastName || '',
+      email: client.email || '',
+      phone: client.phone || '',
+      country: client.country || '',
+      status: client.status || ''
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle update client
+  const handleUpdateClient = async () => {
+    if (!selectedClient || !editClient.firstName || !editClient.lastName || !editClient.email) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      // Import clientAPI for updating client
+      const { clientAPI } = await import('../utils/api');
+      await clientAPI.updateClient(selectedClient._id, editClient);
+      alert('Client updated successfully!');
+      setShowEditModal(false);
+      setSelectedClient(null);
+      setEditClient({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        country: '',
+        status: ''
+      });
+      // Refresh the page to get updated data
+      window.location.reload();
+    } catch (err) {
+      console.error('Error updating client:', err);
+      alert('Failed to update client: ' + (err.message || 'Unknown error'));
+    }
   };
 
   // Generate status data from real analytics
@@ -351,8 +415,20 @@ const ReportsAnalytics = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
-                          <button className="text-blue-600 hover:text-blue-900">Edit</button>
-                          <button className="text-gray-600 hover:text-gray-900">View</button>
+                          <button
+                            onClick={() => handleEditClient(client)}
+                            className="text-blue-600 hover:text-blue-900 transition-colors"
+                            title="Edit client"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewClient(client)}
+                            className="text-gray-600 hover:text-gray-900 transition-colors"
+                            title="View client details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -363,6 +439,182 @@ const ReportsAnalytics = () => {
           </div>
         </div>
       </div>
+
+      {/* View Client Modal */}
+      {showViewModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Client Details</h3>
+              <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center bg-gray-50 p-3 rounded-lg">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-medium ${getAvatarColor(selectedClient.firstName)}`}>
+                  {getInitials(selectedClient.firstName, selectedClient.lastName)}
+                </div>
+                <div className="ml-4">
+                  <h4 className="text-lg font-semibold text-gray-900">
+                    {selectedClient.firstName} {selectedClient.lastName}
+                  </h4>
+                  <p className="text-sm text-gray-600">{selectedClient.email}</p>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedClient.phone || 'N/A'}</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                  <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedClient.country || 'N/A'}</p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <span className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(selectedClient.status)}`}>
+                  {selectedClient.status}
+                </span>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Agent</label>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">
+                  {selectedClient.assignedAgent ? `${selectedClient.assignedAgent.firstName} ${selectedClient.assignedAgent.lastName}` : 'Unassigned'}
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created At</label>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">
+                  {selectedClient.createdAt ? new Date(selectedClient.createdAt).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6">
+              <button 
+                onClick={() => setShowViewModal(false)}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Modal */}
+      {showEditModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Client</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                  <input
+                    type="text"
+                    value={editClient.firstName}
+                    onChange={(e) => setEditClient({...editClient, firstName: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter first name"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <input
+                    type="text"
+                    value={editClient.lastName}
+                    onChange={(e) => setEditClient({...editClient, lastName: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter last name"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                <input
+                  type="email"
+                  value={editClient.email}
+                  onChange={(e) => setEditClient({...editClient, email: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter email address"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <input
+                    type="text"
+                    value={editClient.phone}
+                    onChange={(e) => setEditClient({...editClient, phone: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                  <input
+                    type="text"
+                    value={editClient.country}
+                    onChange={(e) => setEditClient({...editClient, country: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter country"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={editClient.status}
+                  onChange={(e) => setEditClient({...editClient, status: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="New Lead">New Lead</option>
+                  <option value="FTD">FTD</option>
+                  <option value="Call Again">Call Again</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="Not Interested">Not Interested</option>
+                  <option value="Hang Up">Hang Up</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateClient}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Update Client
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

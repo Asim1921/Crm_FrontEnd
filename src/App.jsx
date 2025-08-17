@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ClientManagement from './pages/ClientManagement';
+import ClientProfile from './pages/ClientProfile';
 import TaskManagement from './pages/TaskManagement';
 import CommunicationsHub from './pages/CommunicationsHub';
 import ReportsAnalytics from './pages/ReportsAnalytics';
@@ -24,6 +25,7 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="clients" element={<ClientManagement />} />
+              <Route path="clients/:id" element={<ClientProfile />} />
               <Route path="tasks" element={<TaskManagement />} />
               <Route path="communications" element={<CommunicationsHub />} />
               <Route path="reports" element={<ReportsAnalytics />} />

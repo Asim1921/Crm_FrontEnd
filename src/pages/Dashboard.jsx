@@ -92,11 +92,40 @@ const Dashboard = () => {
 
   // Handle message action - Fixed to use email
   const handleMessage = (client) => {
-    if (client.email) {
-      window.open(`mailto:${client.email}?subject=CRM Follow-up`, '_self');
-    } else {
+    if (!client.email) {
       alert('No email address available for this client');
+      return;
     }
+    
+    // Detect email provider and open appropriate client
+    const email = client.email.toLowerCase();
+    let provider = 'Email Client';
+    
+    if (email.includes('@gmail.com')) {
+      // Gmail Web
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(client.email)}&su=${encodeURIComponent('CRM Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(gmailUrl, '_blank');
+      provider = 'Gmail';
+    } else if (email.includes('@outlook.com') || email.includes('@hotmail.com') || email.includes('@live.com')) {
+      // Outlook Web
+      const outlookUrl = `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(client.email)}&subject=${encodeURIComponent('CRM Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(outlookUrl, '_blank');
+      provider = 'Outlook';
+    } else if (email.includes('@yahoo.com')) {
+      // Yahoo Mail Web
+      const yahooUrl = `https://compose.mail.yahoo.com/?to=${encodeURIComponent(client.email)}&subject=${encodeURIComponent('CRM Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(yahooUrl, '_blank');
+      provider = 'Yahoo Mail';
+    } else {
+      // Default mailto for other providers
+      const mailtoUrl = `mailto:${client.email}?subject=${encodeURIComponent('CRM Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(mailtoUrl, '_self');
+    }
+    
+    // Show success message
+    setTimeout(() => {
+      alert(`${provider} opened for ${client.firstName} ${client.lastName} with pre-filled email`);
+    }, 100);
   };
 
   // Handle export action

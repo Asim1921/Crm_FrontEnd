@@ -15,9 +15,11 @@ import {
   Trash2,
   X
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 const ClientManagement = () => {
+  const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -281,6 +283,87 @@ const ClientManagement = () => {
     }
   };
 
+  // Handle call client
+  const handleCall = (client) => {
+    if (!client.phone) {
+      alert('Client phone number not found');
+      return;
+    }
+    
+    // Format phone number (remove any non-digit characters)
+    const phoneNumber = client.phone.replace(/\D/g, '');
+    
+    // Open dialer
+    const telUrl = `tel:${phoneNumber}`;
+    window.open(telUrl, '_self');
+    
+    // Show success message
+    setTimeout(() => {
+      alert(`Calling ${client.firstName} ${client.lastName} at ${client.phone}`);
+    }, 100);
+  };
+
+  // Handle WhatsApp message
+  const handleWhatsApp = (client) => {
+    if (!client.phone) {
+      alert('Client phone number not found');
+      return;
+    }
+    
+    // Format phone number (remove any non-digit characters)
+    const phoneNumber = client.phone.replace(/\D/g, '');
+    
+    // Default message
+    const defaultMessage = `Hi ${client.firstName}, I hope you're doing well. I wanted to follow up on our previous conversation.`;
+    
+    // Open WhatsApp with pre-filled message
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(defaultMessage)}`;
+    window.open(whatsappUrl, '_blank');
+    
+    // Show success message
+    setTimeout(() => {
+      alert(`WhatsApp opened for ${client.firstName} ${client.lastName} with pre-filled message`);
+    }, 100);
+  };
+
+  // Handle email client
+  const handleEmail = (client) => {
+    if (!client.email) {
+      alert('Client email not found');
+      return;
+    }
+    
+    // Detect email provider and open appropriate client
+    const email = client.email.toLowerCase();
+    let provider = 'Email Client';
+    
+    if (email.includes('@gmail.com')) {
+      // Gmail Web
+      const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(client.email)}&su=${encodeURIComponent('Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(gmailUrl, '_blank');
+      provider = 'Gmail';
+    } else if (email.includes('@outlook.com') || email.includes('@hotmail.com') || email.includes('@live.com')) {
+      // Outlook Web
+      const outlookUrl = `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(client.email)}&subject=${encodeURIComponent('Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(outlookUrl, '_blank');
+      provider = 'Outlook';
+    } else if (email.includes('@yahoo.com')) {
+      // Yahoo Mail Web
+      const yahooUrl = `https://compose.mail.yahoo.com/?to=${encodeURIComponent(client.email)}&subject=${encodeURIComponent('Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(yahooUrl, '_blank');
+      provider = 'Yahoo Mail';
+    } else {
+      // Default mailto for other providers
+      const mailtoUrl = `mailto:${client.email}?subject=${encodeURIComponent('Follow-up')}&body=${encodeURIComponent(`Hi ${client.firstName},\n\nI hope you're doing well. I wanted to follow up on our previous conversation.\n\nBest regards,\nYour Team`)}`;
+      window.open(mailtoUrl, '_self');
+    }
+    
+    // Show success message
+    setTimeout(() => {
+      alert(`${provider} opened for ${client.firstName} ${client.lastName} with pre-filled email`);
+    }, 100);
+  };
+
   // Transform analytics data for charts
   const pieChartData = analytics.clientsByCountry.map((item, index) => ({
     name: item._id,
@@ -466,9 +549,12 @@ const ClientManagement = () => {
                           {getInitials(client.firstName, client.lastName)}
                         </div>
                         <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">
+                          <button
+                            onClick={() => navigate(`/clients/${client._id}`)}
+                            className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
+                          >
                             {client.firstName} {client.lastName}
-                          </div>
+                          </button>
                         </div>
                       </div>
                     </td>
@@ -485,13 +571,25 @@ const ClientManagement = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
-                        <button className="text-gray-400 hover:text-gray-600">
+                        <button 
+                          onClick={() => handleCall(client)}
+                          className="text-gray-400 hover:text-blue-600 transition-colors"
+                          title="Call client"
+                        >
                           <Phone className="w-4 h-4" />
                         </button>
-                        <button className="text-gray-400 hover:text-gray-600">
+                        <button 
+                          onClick={() => handleWhatsApp(client)}
+                          className="text-gray-400 hover:text-green-600 transition-colors"
+                          title="Send WhatsApp message"
+                        >
                           <MessageCircle className="w-4 h-4" />
                         </button>
-                        <button className="text-gray-400 hover:text-gray-600">
+                        <button 
+                          onClick={() => handleEmail(client)}
+                          className="text-gray-400 hover:text-orange-600 transition-colors"
+                          title="Send email"
+                        >
                           <Mail className="w-4 h-4" />
                         </button>
                       </div>

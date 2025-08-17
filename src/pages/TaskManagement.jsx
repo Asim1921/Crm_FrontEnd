@@ -6,7 +6,8 @@ import {
   Calendar,
   User,
   Mail,
-  Phone
+  Phone,
+  X
 } from 'lucide-react';
 import { taskAPI } from '../utils/api';
 
@@ -19,6 +20,18 @@ const TaskManagement = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+
+  // Modal states
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [editTask, setEditTask] = useState({
+    title: '',
+    description: '',
+    status: '',
+    priority: '',
+    dueDate: ''
+  });
 
   // Fetch tasks data
   useEffect(() => {
@@ -108,6 +121,69 @@ const TaskManagement = () => {
         return 'bg-green-100 text-green-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Handle view task
+  const handleViewTask = (task) => {
+    setSelectedTask(task);
+    setShowViewModal(true);
+  };
+
+  // Handle edit task
+  const handleEditTask = (task) => {
+    setSelectedTask(task);
+    setEditTask({
+      title: task.title || '',
+      description: task.description || '',
+      status: task.status || '',
+      priority: task.priority || '',
+      dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle update task
+  const handleUpdateTask = async () => {
+    if (!selectedTask || !editTask.title || !editTask.description) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      await taskAPI.updateTask(selectedTask._id, editTask);
+      alert('Task updated successfully!');
+      setShowEditModal(false);
+      setSelectedTask(null);
+      setEditTask({
+        title: '',
+        description: '',
+        status: '',
+        priority: '',
+        dueDate: ''
+      });
+      // Refresh the tasks list
+      window.location.reload();
+    } catch (err) {
+      console.error('Error updating task:', err);
+      alert('Failed to update task: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle delete task
+  const handleDeleteTask = async (task) => {
+    if (!confirm(`Are you sure you want to delete the task "${task.title}"?`)) {
+      return;
+    }
+
+    try {
+      await taskAPI.deleteTask(task._id);
+      alert('Task deleted successfully!');
+      // Refresh the tasks list
+      window.location.reload();
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      alert('Failed to delete task: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -406,9 +482,27 @@ const TaskManagement = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center space-x-2">
-                          <Eye className="w-4 h-4 text-gray-400 cursor-pointer hover:text-blue-600" />
-                          <Edit className="w-4 h-4 text-gray-400 cursor-pointer hover:text-green-600" />
-                          <Trash2 className="w-4 h-4 text-gray-400 cursor-pointer hover:text-red-600" />
+                          <button
+                            onClick={() => handleViewTask(task)}
+                            className="text-gray-400 hover:text-blue-600 transition-colors"
+                            title="View task details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditTask(task)}
+                            className="text-gray-400 hover:text-green-600 transition-colors"
+                            title="Edit task"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTask(task)}
+                            className="text-gray-400 hover:text-red-600 transition-colors"
+                            title="Delete task"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -468,6 +562,175 @@ const TaskManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* View Task Modal */}
+      {showViewModal && selectedTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Task Details</h3>
+              <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedTask.title}</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg whitespace-pre-wrap">{selectedTask.description}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedTask.status)}`}>
+                    {selectedTask.status}
+                  </span>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedTask.priority)}`}>
+                    {selectedTask.priority}
+                  </span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">
+                  {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : 'N/A'}
+                </p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Client</label>
+                <div className="flex items-center bg-gray-50 p-3 rounded-lg">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(selectedTask.client?.firstName || '')}`}>
+                    {getInitials(selectedTask.client?.firstName, selectedTask.client?.lastName)}
+                  </div>
+                  <span className="ml-3 text-sm font-medium text-gray-900">
+                    {selectedTask.client ? `${selectedTask.client.firstName} ${selectedTask.client.lastName}` : 'N/A'}
+                  </span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Created At</label>
+                <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">
+                  {selectedTask.createdAt ? new Date(selectedTask.createdAt).toLocaleString() : 'N/A'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6">
+              <button 
+                onClick={() => setShowViewModal(false)}
+                className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {showEditModal && selectedTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Task</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={editTask.title}
+                  onChange={(e) => setEditTask({...editTask, title: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter task title"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
+                <textarea
+                  value={editTask.description}
+                  onChange={(e) => setEditTask({...editTask, description: e.target.value})}
+                  rows={4}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter task description"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <select
+                    value={editTask.status}
+                    onChange={(e) => setEditTask({...editTask, status: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="in-progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                  <select
+                    value={editTask.priority}
+                    onChange={(e) => setEditTask({...editTask, priority: e.target.value})}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  value={editTask.dueDate}
+                  onChange={(e) => setEditTask({...editTask, dueDate: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateTask}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Update Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
