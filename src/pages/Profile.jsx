@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { 
   Camera, 
@@ -16,16 +16,33 @@ const Profile = () => {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState({
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    email: 'sarah.johnson@techcorp.com',
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
     phone: '+1 (555) 123-4567',
-    bio: 'Passionate product designer with 5+ years of experience creating user-centered digital experiences.',
-    company: 'TechCorp',
-    title: 'Product Designer',
-    location: 'San Francisco, CA',
-    joinedDate: 'March 2023'
+    bio: 'Passionate CRM agent with experience in client management and relationship building.',
+    company: 'CRM Platform',
+    title: user?.role === 'admin' ? 'Administrator' : 'Agent',
+    location: 'Remote',
+    joinedDate: user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'
   });
+
+  // Update profile data when user data changes
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: '+1 (555) 123-4567',
+        bio: 'Passionate CRM agent with experience in client management and relationship building.',
+        company: 'CRM Platform',
+        title: user.role === 'admin' ? 'Administrator' : 'Agent',
+        location: 'Remote',
+        joinedDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'
+      });
+    }
+  }, [user]);
 
   const handleChange = (e) => {
     setProfileData({
@@ -51,7 +68,9 @@ const Profile = () => {
               <div className="flex items-start space-x-6">
                 <div className="relative">
                   <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center">
-                    <span className="text-2xl font-bold text-gray-600">SJ</span>
+                    <span className="text-2xl font-bold text-gray-600">
+                      {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                    </span>
                   </div>
                   <button className="absolute -bottom-1 -right-1 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors">
                     <Camera className="w-4 h-4 text-white" />

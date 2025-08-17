@@ -10,7 +10,7 @@ const Header = ({ title }) => {
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
           <span className="bg-blue-100 text-blue-600 text-sm px-3 py-1 rounded-full font-medium">
-            Administrator
+            {user?.role === 'admin' ? 'Administrator' : 'Agent'}
           </span>
         </div>
         
@@ -42,7 +42,9 @@ const Header = ({ title }) => {
                 <span className="text-sm font-medium text-gray-800">
                   {user?.firstName} {user?.lastName}
                 </span>
-                <span className="text-xs text-gray-500">Administrator</span>
+                <span className="text-xs text-gray-500">
+                  {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+                </span>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400" />
             </div>

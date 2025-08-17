@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import LoginModal from '../components/LoginModal';
+import RegisterModal from '../components/RegisterModal';
 
-const Login = () => {
-  const { login, isAuthenticated, user } = useAuth();
+const Register = () => {
+  const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
 
@@ -16,12 +16,27 @@ const Login = () => {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleLogin = async (formData) => {
+  const handleRegister = async (formData) => {
     try {
-      await login(formData.username, formData.password);
-      navigate('/dashboard');
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Registration successful, redirect to login
+        navigate('/login');
+      } else {
+        throw new Error(data.message || 'Registration failed');
+      }
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Registration failed:', error);
+      throw error;
     }
   };
 
@@ -164,14 +179,14 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Login Modal */}
-      <LoginModal 
+      {/* Register Modal */}
+      <RegisterModal 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
-        onLogin={handleLogin} 
+        onRegister={handleRegister} 
       />
     </div>
   );
 };
 
-export default Login;
+export default Register;

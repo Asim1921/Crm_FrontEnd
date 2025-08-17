@@ -12,11 +12,9 @@ const PageHeader = ({ title, subtitle }) => {
             <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
             {subtitle && <p className="text-gray-600">{subtitle}</p>}
           </div>
-          {user?.role === 'admin' && (
-            <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full">
-              Administrator
-            </span>
-          )}
+          <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full">
+            {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+          </span>
         </div>
         <div className="flex items-center space-x-4">
           <div className="relative">
@@ -33,11 +31,17 @@ const PageHeader = ({ title, subtitle }) => {
           </div>
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-medium">JA</span>
+              <span className="text-white font-medium">
+                {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+              </span>
             </div>
             <div>
-              <p className="font-medium text-gray-900">John Anderson</p>
-              <p className="text-sm text-gray-600">Administrator</p>
+              <p className="text-sm font-medium text-gray-800">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-gray-500">
+                {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+              </p>
             </div>
           </div>
         </div>

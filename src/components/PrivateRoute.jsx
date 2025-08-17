@@ -5,18 +5,16 @@ import Sidebar from './Sidebar';
 const PrivateRoute = () => {
   const { isAuthenticated, loading } = useAuth();
 
-  // Temporarily bypass authentication check for demo purposes
-  // Remove this condition when you want to restore authentication
-  if (false) { // Changed from !isAuthenticated to false
-    return <Navigate to="/login" replace />;
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
 
   return (
