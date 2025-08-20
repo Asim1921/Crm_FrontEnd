@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { communicationAPI, clientAPI } from '../utils/api';
 import twilioAPI from '../utils/twilioAPI';
+import telegramAPI from '../utils/telegramAPI';
 
 const CommunicationsHub = () => {
   const { user } = useAuth();
@@ -525,62 +526,28 @@ The call is now being processed by Twilio. You should receive a call on your reg
       
       // Open appropriate messaging app
       if (messageData.channel === 'telegram') {
-        // Simple and reliable Telegram integration
-        const telegramWebUrl = `https://web.telegram.org/k/`;
-        
-        // Try to copy message to clipboard
-        try {
-          navigator.clipboard.writeText(messageData.content).then(() => {
-            // Open Telegram Web directly
-            window.open(telegramWebUrl, '_blank');
-            
-            const instructions = `📱 Telegram Web opened! Here's how to send your message:
+        // Check if user wants anonymous messaging
+        const useAnonymous = confirm(`📱 Telegram Messaging Options:
 
-🔍 **Step 1: Find the Contact**
-- Click the search icon (🔍) in Telegram
-- Search for: ${phoneNumber} or "${clientName}"
-- Or search by the person's name if you have them saved
+🔒 **Anonymous Mode (Recommended)**
+- Client's phone number will be hidden
+- Only the client's name will be visible
+- Messages sent through a secure bot
+- Better privacy protection
 
-📝 **Step 2: Send Message**
-✅ Message copied to clipboard! Just paste (Ctrl+V) in the chat.
+📞 **Direct Mode**
+- Uses Telegram Web/App directly
+- Client's phone number may be visible
+- Requires manual contact search
 
-💡 **Tips:**
-- If the contact isn't found, they may need to be in your contacts first
-- You can also try searching by the person's name: "${clientName}"
-- Make sure you're logged into Telegram Web
+Choose "OK" for Anonymous Mode or "Cancel" for Direct Mode.`);
 
-📱 **Alternative:** Use Telegram Desktop or Mobile app for better contact search`;
-            
-            setTimeout(() => {
-              alert(instructions);
-            }, 2000);
-          });
-        } catch (error) {
-          // Fallback if clipboard API is not available
-          window.open(telegramWebUrl, '_blank');
-          
-          const instructions = `📱 Telegram Web opened! Here's how to send your message:
-
-🔍 **Step 1: Find the Contact**
-- Click the search icon (🔍) in Telegram
-- Search for: ${phoneNumber} or "${clientName}"
-- Or search by name if you have the contact saved
-
-📝 **Step 2: Copy & Send Message**
-Copy this message and paste it in the chat:
-
-"${messageData.content}"
-
-💡 **Tips:**
-- If the contact isn't found, they may need to be in your contacts first
-- You can also try searching by the person's name: "${clientName}"
-- Make sure you're logged into Telegram Web
-
-📱 **Alternative:** Use Telegram Desktop or Mobile app for better contact search`;
-          
-          setTimeout(() => {
-            alert(instructions);
-          }, 2002);
+        if (useAnonymous) {
+          // Anonymous messaging through Telegram Bot API
+          await sendAnonymousTelegramMessage(selectedClient, messageData.content);
+        } else {
+          // Direct Telegram Web approach (current implementation)
+          await sendDirectTelegramMessage(selectedClient, messageData.content);
         }
       }
 
@@ -590,13 +557,177 @@ Copy this message and paste it in the chat:
       // Add notification for the message
       addMessageNotification(messageData.channel, clientName, messageData.clientId);
       
-      alert('Message app opened successfully!');
       setShowMessageModal(false);
       setMessageData({ clientId: '', content: '', channel: 'telegram' });
     } catch (error) {
       alert('Failed to send message: ' + error.message);
     } finally {
       setActionLoading({ ...actionLoading, message: false });
+    }
+  };
+
+  // New function for anonymous Telegram messaging
+  const sendAnonymousTelegramMessage = async (client, messageContent) => {
+    try {
+      // This would typically call a backend API that handles Telegram Bot API
+      // For now, we'll simulate the process and provide setup instructions
+      
+      const clientName = `${client.firstName} ${client.lastName}`;
+      const phoneNumber = client.phone.replace(/\D/g, '');
+      
+      // Simulate API call to backend
+      const response = await fetch('/api/telegram/send-anonymous', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          clientId: client._id,
+          clientName: clientName,
+          phoneNumber: phoneNumber,
+          message: messageContent,
+          agentId: user._id,
+          agentName: `${user.firstName} ${user.lastName}`
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`✅ Anonymous Telegram Message Sent Successfully!
+
+📱 **Message Details:**
+👤 To: ${clientName}
+📝 Message: "${messageContent.substring(0, 50)}${messageContent.length > 50 ? '...' : ''}"
+🔒 Mode: Anonymous (Phone number hidden)
+🤖 Sent via: Telegram Bot
+
+💡 **How it works:**
+- The client receives a message from your CRM bot
+- Only the client's name is visible, not their phone number
+- The message appears to come from your company, not a personal number
+- Complete privacy protection for both parties`);
+      } else {
+        // Fallback to setup instructions if API is not available
+        showTelegramBotSetupInstructions(client, messageContent);
+      }
+    } catch (error) {
+      console.error('Telegram Bot API error:', error);
+      // Fallback to setup instructions
+      showTelegramBotSetupInstructions(client, messageContent);
+    }
+  };
+
+  // Function to show Telegram Bot setup instructions
+  const showTelegramBotSetupInstructions = (client, messageContent) => {
+    const clientName = `${client.firstName} ${client.lastName}`;
+    const phoneNumber = client.phone.replace(/\D/g, '');
+    
+    const instructions = `🔧 **Telegram Bot Setup Required**
+
+To enable anonymous messaging where client phone numbers are hidden, you need to set up a Telegram Bot:
+
+📋 **Step 1: Create Telegram Bot**
+1. Open Telegram and search for "@BotFather"
+2. Send: /newbot
+3. Follow instructions to create your bot
+4. Save the bot token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
+
+📋 **Step 2: Configure Backend**
+Add to your backend .env file:
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_BOT_USERNAME=your_bot_username
+
+📋 **Step 3: Backend API Setup**
+Create endpoint: POST /api/telegram/send-anonymous
+This will handle sending messages through the bot API
+
+💡 **Benefits of Bot Approach:**
+✅ Client phone numbers remain hidden
+✅ Only client names are visible
+✅ Professional company branding
+✅ Better privacy protection
+✅ Automated message delivery
+
+📱 **For now, using direct Telegram approach...**`;
+    
+    alert(instructions);
+    
+    // Fallback to direct approach
+    setTimeout(() => {
+      sendDirectTelegramMessage(client, messageContent);
+    }, 1000);
+  };
+
+  // Function for direct Telegram messaging (current approach)
+  const sendDirectTelegramMessage = async (client, messageContent) => {
+    const clientName = `${client.firstName} ${client.lastName}`;
+    const phoneNumber = client.phone.replace(/\D/g, '');
+    
+    // Simple and reliable Telegram integration
+    const telegramWebUrl = `https://web.telegram.org/k/`;
+    
+    // Try to copy message to clipboard
+    try {
+      navigator.clipboard.writeText(messageContent).then(() => {
+        // Open Telegram Web directly
+        window.open(telegramWebUrl, '_blank');
+        
+        const instructions = `📱 Telegram Web opened! Here's how to send your message:
+
+🔍 **Step 1: Find the Contact**
+- Click the search icon (🔍) in Telegram
+- Search for: ${phoneNumber} or "${clientName}"
+- Or search by the person's name if you have them saved
+
+📝 **Step 2: Send Message**
+✅ Message copied to clipboard! Just paste (Ctrl+V) in the chat.
+
+⚠️ **Privacy Note:**
+- The client may see your phone number
+- For better privacy, consider setting up the Telegram Bot (see previous instructions)
+
+💡 **Tips:**
+- If the contact isn't found, they may need to be in your contacts first
+- You can also try searching by the person's name: "${clientName}"
+- Make sure you're logged into Telegram Web
+
+📱 **Alternative:** Use Telegram Desktop or Mobile app for better contact search`;
+        
+        setTimeout(() => {
+          alert(instructions);
+        }, 2000);
+      });
+    } catch (error) {
+      // Fallback if clipboard API is not available
+      window.open(telegramWebUrl, '_blank');
+      
+      const instructions = `📱 Telegram Web opened! Here's how to send your message:
+
+🔍 **Step 1: Find the Contact**
+- Click the search icon (🔍) in Telegram
+- Search for: ${phoneNumber} or "${clientName}"
+- Or search by name if you have the contact saved
+
+📝 **Step 2: Copy & Send Message**
+Copy this message and paste it in the chat:
+
+"${messageContent}"
+
+⚠️ **Privacy Note:**
+- The client may see your phone number
+- For better privacy, consider setting up the Telegram Bot
+
+💡 **Tips:**
+- If the contact isn't found, they may need to be in your contacts first
+- You can also try searching by the person's name: "${clientName}"
+- Make sure you're logged into Telegram Web
+
+📱 **Alternative:** Use Telegram Desktop or Mobile app for better contact search`;
+      
+      setTimeout(() => {
+        alert(instructions);
+      }, 2002);
     }
   };
 
