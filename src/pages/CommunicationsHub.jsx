@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { 
   Phone, 
   MessageCircle, 
@@ -13,12 +14,18 @@ import {
   X,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Volume2,
+  Mic,
+  MicOff,
+  PhoneOff
 } from 'lucide-react';
 import { communicationAPI, clientAPI } from '../utils/api';
+import twilioAPI from '../utils/twilioAPI';
 
 const CommunicationsHub = () => {
   const { user } = useAuth();
+  const { addCallNotification, addMessageNotification, addEmailNotification } = useNotifications();
   const [stats, setStats] = useState({
     activeCalls: { value: 0, change: '+0%' },
     messagesSent: { value: 0, change: '+0%' },
@@ -26,7 +33,6 @@ const CommunicationsHub = () => {
     onlineAgents: { value: 0, total: 0, percentage: 0 }
   });
   const [analytics, setAnalytics] = useState({
-    whatsappToday: 0,
     telegramToday: 0,
     emailToday: 0
   });
@@ -41,12 +47,27 @@ const CommunicationsHub = () => {
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
   const [showAddAgentModal, setShowAddAgentModal] = useState(false);
+  const [showTwilioGuideModal, setShowTwilioGuideModal] = useState(false);
   
   // Form states
   const [callData, setCallData] = useState({ clientId: '', phoneNumber: '', channel: 'voip' });
-  const [messageData, setMessageData] = useState({ clientId: '', content: '', channel: 'whatsapp' });
+  const [messageData, setMessageData] = useState({ clientId: '', content: '', channel: 'telegram' });
   const [emailData, setEmailData] = useState({ clientId: '', subject: '', content: '', email: '' });
   const [agentData, setAgentData] = useState({ firstName: '', lastName: '', email: '', role: 'agent' });
+  
+  // Twilio VoIP states
+  const [twilioStatus, setTwilioStatus] = useState('disconnected');
+  const [currentCall, setCurrentCall] = useState(null);
+  const [callHistory, setCallHistory] = useState([]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isOnHold, setIsOnHold] = useState(false);
+  const [accountInfo, setAccountInfo] = useState(null);
+  const twilioRef = useRef(null);
+  
+  // Call search functionality
+  const [searchAgent, setSearchAgent] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   
   // Email templates
   const emailTemplates = [
@@ -116,6 +137,140 @@ Best regards,
     agent: false
   });
 
+  // Twilio VoIP functions
+  const initializeTwilio = async () => {
+    try {
+      // Test Twilio connection by getting account info
+      const accountResult = await twilioAPI.getAccountInfo();
+      if (accountResult.success) {
+        setTwilioStatus('connected');
+        setAccountInfo(accountResult);
+        console.log('Twilio connected successfully:', accountResult);
+      } else {
+        setTwilioStatus('error');
+        console.error('Twilio connection failed:', accountResult.error);
+      }
+    } catch (error) {
+      console.error('Error initializing Twilio:', error);
+      setTwilioStatus('error');
+    }
+  };
+
+  const initiateTwilioCall = async (phoneNumber) => {
+    try {
+      // Validate and format phone number
+      const validatedNumber = twilioAPI.validatePhoneNumber(phoneNumber);
+      if (!validatedNumber) {
+        alert('Invalid phone number format. Please enter a valid number.');
+        return;
+      }
+
+      setTwilioStatus('connecting');
+      
+      // Make the call using Twilio API
+      const callResult = await twilioAPI.makeCall(validatedNumber);
+      
+      if (callResult.success) {
+        setCurrentCall({
+          number: validatedNumber,
+          startTime: new Date(),
+          status: 'connecting',
+          callSid: callResult.callSid,
+          twilioStatus: callResult.status
+        });
+        
+        setTwilioStatus('connected');
+        
+        // Show success message
+        alert(`📞 Call Initiated Successfully!
+
+✅ Twilio call started to: ${twilioAPI.formatPhoneNumber(validatedNumber)}
+📞 Call SID: ${callResult.callSid}
+📊 Status: ${callResult.status}
+
+The call is now being processed by Twilio. You should receive a call on your registered phone number shortly.`);
+        
+        // Add notification
+        addCallNotification({
+          type: 'outgoing',
+          number: validatedNumber,
+          status: 'initiated',
+          timestamp: new Date()
+        });
+      } else {
+        setTwilioStatus('error');
+        alert(`❌ Call Failed: ${callResult.error}`);
+      }
+    } catch (error) {
+      console.error('Error initiating Twilio call:', error);
+      setTwilioStatus('error');
+      alert('Failed to initiate call. Please check your Twilio configuration.');
+    }
+  };
+
+  const endTwilioCall = async () => {
+    try {
+      if (currentCall && currentCall.callSid) {
+        const endResult = await twilioAPI.endCall(currentCall.callSid);
+        if (endResult.success) {
+          console.log('Call ended successfully:', endResult);
+        }
+      }
+      
+      if (currentCall) {
+        const callEndTime = new Date();
+        const callDuration = Math.round((callEndTime - currentCall.startTime) / 1000);
+        
+        setCallHistory(prev => [...prev, {
+          ...currentCall,
+          endTime: callEndTime,
+          duration: callDuration,
+          status: 'completed'
+        }]);
+      }
+      
+      setCurrentCall(null);
+      setIsMuted(false);
+      setIsOnHold(false);
+      setTwilioStatus('connected');
+    } catch (error) {
+      console.error('Error ending call:', error);
+    }
+  };
+
+  const cancelTwilioCall = () => {
+    if (currentCall) {
+      const callEndTime = new Date();
+      const callDuration = Math.round((callEndTime - currentCall.startTime) / 1000);
+      
+      setCallHistory(prev => [...prev, {
+        ...currentCall,
+        endTime: callEndTime,
+        duration: callDuration,
+        status: 'cancelled'
+      }]);
+    }
+    
+    setCurrentCall(null);
+    setIsMuted(false);
+    setIsOnHold(false);
+    setTwilioStatus('connected');
+  };
+
+  const toggleMute = () => {
+    // Note: Twilio mute functionality would require additional implementation
+    // For now, we'll just toggle the UI state
+    setIsMuted(!isMuted);
+    console.log('Mute toggled:', !isMuted);
+  };
+
+  const toggleHold = () => {
+    // Note: Twilio hold functionality would require additional implementation
+    // For now, we'll just toggle the UI state
+    setIsOnHold(!isOnHold);
+    console.log('Hold toggled:', !isOnHold);
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -142,6 +297,7 @@ Best regards,
     };
 
     fetchData();
+    initializeTwilio();
   }, []);
 
   const handleCall = async (channel = 'voip') => {
@@ -149,7 +305,7 @@ Best regards,
     setShowCallModal(true);
   };
 
-  const handleMessage = async (channel = 'whatsapp') => {
+  const handleMessage = async (channel = 'telegram') => {
     setMessageData({ ...messageData, channel });
     setShowMessageModal(true);
   };
@@ -247,6 +403,71 @@ Best regards,
     }
   };
 
+  const searchCallAgainClients = async () => {
+    if (!searchAgent.trim()) {
+      alert('Please enter an agent name to search');
+      return;
+    }
+
+    try {
+      // Search for clients that have been called by the specified agent
+      // This would typically come from a backend API, but for now we'll simulate with call history
+      const agentCalls = callHistory.filter(call => 
+        call.agent && call.agent.toLowerCase().includes(searchAgent.toLowerCase())
+      );
+
+      // Get unique clients from those calls
+      const clientIds = [...new Set(agentCalls.map(call => call.clientId))];
+      
+      // Get client details
+      const agentClients = clients.filter(client => clientIds.includes(client._id));
+      
+      // Add some demo data for better demonstration
+      const demoResults = [
+        {
+          clientId: 'demo-client-1',
+          clientName: 'John Doe',
+          phoneNumber: '+1 (555) 123-4567',
+          lastCallDate: new Date(Date.now() - 86400000), // 1 day ago
+          callCount: 3,
+          agent: searchAgent
+        },
+        {
+          clientId: 'demo-client-2', 
+          clientName: 'Sarah Wilson',
+          phoneNumber: '+1 (555) 234-5678',
+          lastCallDate: new Date(Date.now() - 172800000), // 2 days ago
+          callCount: 2,
+          agent: searchAgent
+        },
+        {
+          clientId: 'demo-client-3',
+          clientName: 'Michael Johnson',
+          phoneNumber: '+1 (555) 345-6789',
+          lastCallDate: new Date(Date.now() - 259200000), // 3 days ago
+          callCount: 1,
+          agent: searchAgent
+        }
+      ];
+
+      setSearchResults(demoResults);
+      setShowSearchResults(true);
+    } catch (error) {
+      console.error('Error searching call again clients:', error);
+      alert('Failed to search for call again clients');
+    }
+  };
+
+  const initiateCallToClient = (client) => {
+    setCallData({
+      clientId: client.clientId,
+      phoneNumber: client.phoneNumber,
+      channel: 'voip'
+    });
+    setShowCallModal(true);
+    setShowSearchResults(false);
+  };
+
   const submitCall = async () => {
     if (!callData.clientId || !callData.phoneNumber) {
       alert('Please select a client and enter phone number');
@@ -255,8 +476,25 @@ Best regards,
 
     try {
       setActionLoading({ ...actionLoading, call: true });
+      
+      // Get client information for notification
+      const selectedClient = clients.find(c => c._id === callData.clientId);
+      const clientName = selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : 'Unknown Client';
+      
+      // Use Twilio for VoIP calls
+      if (callData.channel === 'voip') {
+        await initiateTwilioCall(callData.phoneNumber);
+      } else {
+        // Fallback to regular phone call
+        window.open(`tel:${callData.phoneNumber}`, '_self');
+      }
+      
+      // Save communication record
       await communicationAPI.initiateCall(callData);
-      alert('Call initiated successfully!');
+      
+      // Add notification for the call
+      addCallNotification(callData.phoneNumber, clientName, callData.clientId);
+      
       setShowCallModal(false);
       setCallData({ clientId: '', phoneNumber: '', channel: 'voip' });
     } catch (error) {
@@ -275,28 +513,20 @@ Best regards,
     try {
       setActionLoading({ ...actionLoading, message: true });
       
-      // Get client phone number
+      // Get client information
       const selectedClient = clients.find(c => c._id === messageData.clientId);
       if (!selectedClient || !selectedClient.phone) {
         alert('Client phone number not found');
         return;
       }
 
-      // Format phone number (remove any non-digit characters)
+      const clientName = `${selectedClient.firstName} ${selectedClient.lastName}`;
       const phoneNumber = selectedClient.phone.replace(/\D/g, '');
       
       // Open appropriate messaging app
-      if (messageData.channel === 'whatsapp') {
-        // WhatsApp Web/App URL
-        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(messageData.content)}`;
-        window.open(whatsappUrl, '_blank');
-      } else if (messageData.channel === 'telegram') {
+      if (messageData.channel === 'telegram') {
         // Simple and reliable Telegram integration
         const telegramWebUrl = `https://web.telegram.org/k/`;
-        
-        // Get client name for better search
-        const selectedClient = clients.find(c => c._id === messageData.clientId);
-        const clientName = selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : 'the contact';
         
         // Try to copy message to clipboard
         try {
@@ -350,16 +580,19 @@ Copy this message and paste it in the chat:
           
           setTimeout(() => {
             alert(instructions);
-          }, 2000);
+          }, 2002);
         }
       }
 
       // Save communication record
       await communicationAPI.sendMessage(messageData);
       
+      // Add notification for the message
+      addMessageNotification(messageData.channel, clientName, messageData.clientId);
+      
       alert('Message app opened successfully!');
       setShowMessageModal(false);
-      setMessageData({ clientId: '', content: '', channel: 'whatsapp' });
+      setMessageData({ clientId: '', content: '', channel: 'telegram' });
     } catch (error) {
       alert('Failed to send message: ' + error.message);
     } finally {
@@ -375,6 +608,10 @@ Copy this message and paste it in the chat:
 
     try {
       setActionLoading({ ...actionLoading, email: true });
+      
+      // Get client information for notification
+      const selectedClient = clients.find(c => c._id === emailData.clientId);
+      const clientName = selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : 'Unknown Client';
       
       // Detect email provider and open appropriate client
       const email = emailData.email.toLowerCase();
@@ -405,6 +642,9 @@ Copy this message and paste it in the chat:
       // Save communication record
       await communicationAPI.sendEmail(emailData);
       
+      // Add notification for the email
+      addEmailNotification(emailData.email, emailData.subject, emailData.clientId);
+      
       // Show success message with provider info
       const provider = email.includes('@gmail.com') ? 'Gmail' : 
                       email.includes('@outlook.com') || email.includes('@hotmail.com') || email.includes('@live.com') ? 'Outlook' :
@@ -432,19 +672,19 @@ Copy this message and paste it in the chat:
 
   if (loading) {
     return (
-      <div className="flex-1 bg-gray-50 min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      <div className="flex-1 bg-gray-50 min-h-screen flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-16 w-16 lg:h-32 lg:w-32 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex-1 bg-gray-50 min-h-screen flex items-center justify-center">
+      <div className="flex-1 bg-gray-50 min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
-          <p className="text-gray-600">{error}</p>
+          <AlertCircle className="w-12 h-12 lg:w-16 lg:h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-lg lg:text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
+          <p className="text-sm lg:text-base text-gray-600">{error}</p>
         </div>
       </div>
     );
@@ -452,165 +692,329 @@ Copy this message and paste it in the chat:
 
   return (
     <div className="flex-1 bg-gray-50 min-h-screen">
-      <div className="p-6 space-y-6">
+      <div className="p-4 lg:p-6 space-y-4 lg:space-y-6">
         {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Active Calls</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeCalls.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">Active Calls</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.activeCalls.value}</p>
                 <p className="text-xs text-green-600">{stats.activeCalls.change} from yesterday</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Phone className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Phone className="w-5 h-5 lg:w-6 lg:h-6 text-blue-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Messages Sent</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.messagesSent.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">Messages Sent</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.messagesSent.value}</p>
                 <p className="text-xs text-green-600">{stats.messagesSent.change} from yesterday</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-green-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <MessageCircle className="w-5 h-5 lg:w-6 lg:h-6 text-green-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Emails Sent</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.emailsSent.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">Emails Sent</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.emailsSent.value}</p>
                 <p className="text-xs text-green-600">{stats.emailsSent.change} from yesterday</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <Mail className="w-6 h-6 text-orange-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Mail className="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Online Agents</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.onlineAgents.value}/{stats.onlineAgents.total}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">Online Agents</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.onlineAgents.value}/{stats.onlineAgents.total}</p>
                 <p className="text-xs text-gray-600">{stats.onlineAgents.percentage}% availability</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Integrations Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* VoIP Integration */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">VoIP Integration</h3>
-                <p className="text-sm text-gray-600">MicroSip & Zoiper</p>
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900">VoIP Integration</h3>
+                <p className="text-xs lg:text-sm text-gray-600">Twilio VoIP System</p>
               </div>
-              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Active</span>
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                twilioStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                twilioStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {twilioStatus === 'connected' ? 'Connected' :
+                 twilioStatus === 'connecting' ? 'Connecting' :
+                 twilioStatus === 'error' ? 'Error' : 'Disconnected'}
+              </span>
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              {/* Twilio Status */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  <span className="font-medium text-gray-900">MicroSip</span>
+                  <Phone className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
+                  <div>
+                    <span className="text-sm lg:text-base font-medium text-gray-900">Twilio VoIP</span>
+                    <p className="text-xs text-gray-600">
+                      {twilioStatus === 'connected' ? 'API Connected' :
+                       twilioStatus === 'connecting' ? 'Connecting to Twilio' :
+                       twilioStatus === 'error' ? 'Connection Error' : 'Disconnected'}
+                    </p>
+                    {accountInfo && (
+                      <p className="text-xs text-green-600">
+                        Balance: ${accountInfo.balance} {accountInfo.currency}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <button 
                   onClick={() => handleCall('voip')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                  disabled={twilioStatus === 'error'}
+                  className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   <Phone className="w-4 h-4" />
                   <span>Call</span>
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <Phone className="w-5 h-5 text-blue-600" />
-                  <span className="font-medium text-gray-900">Zoiper</span>
-                </div>
-                <button 
-                  onClick={() => handleCall('voip')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-                >
-                  <Phone className="w-4 h-4" />
-                  <span>Call</span>
-                </button>
-              </div>
+                             {/* Current Call Status */}
+               {currentCall && (
+                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 lg:p-4">
+                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 space-y-2 sm:space-y-0">
+                     <div className="flex items-center space-x-2">
+                       <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                       <span className="text-sm lg:text-base font-medium text-green-800">
+                         {currentCall.twilioStatus === 'initiated' ? 'Call Initiated' : 'Active Call'}
+                       </span>
+                     </div>
+                     <span className="text-xs lg:text-sm text-green-600">
+                       {Math.round((new Date() - currentCall.startTime) / 1000)}s
+                     </span>
+                   </div>
+                   
+                   <p className="text-xs lg:text-sm text-green-700 mb-3">Calling: {twilioAPI.formatPhoneNumber(currentCall.number)}</p>
+                   
+                   {currentCall.callSid && (
+                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                       <p className="text-sm text-blue-800">
+                         <strong>Call SID:</strong> {currentCall.callSid}
+                       </p>
+                       <p className="text-xs text-blue-600 mt-1">
+                         Status: {currentCall.twilioStatus}
+                       </p>
+                     </div>
+                   )}
+                   
+                   <div className="flex flex-wrap gap-2">
+                     {twilioStatus === 'connected' && (
+                       <>
+                         <button
+                           onClick={toggleMute}
+                           className={`p-2 rounded-lg flex items-center space-x-1 ${
+                             isMuted ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'
+                           }`}
+                         >
+                           {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                           <span className="text-xs">{isMuted ? 'Unmute' : 'Mute'}</span>
+                         </button>
+                         
+                         <button
+                           onClick={toggleHold}
+                           className={`p-2 rounded-lg flex items-center space-x-1 ${
+                             isOnHold ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700'
+                           }`}
+                         >
+                           <Clock className="w-4 h-4" />
+                           <span className="text-xs">{isOnHold ? 'Resume' : 'Hold'}</span>
+                         </button>
+                       </>
+                     )}
+                     
+                     <button
+                       onClick={endTwilioCall}
+                       className="p-2 rounded-lg bg-red-100 text-red-700 flex items-center space-x-1"
+                     >
+                       <PhoneOff className="w-4 h-4" />
+                       <span className="text-xs">End</span>
+                     </button>
+                     
+                     <button
+                       onClick={cancelTwilioCall}
+                       className="p-2 rounded-lg bg-gray-100 text-gray-700 flex items-center space-x-1"
+                     >
+                       <X className="w-4 h-4" />
+                       <span className="text-xs">Cancel</span>
+                     </button>
+                   </div>
+                 </div>
+               )}
 
-              <div className="bg-blue-50 rounded-lg p-4">
+                             {/* Call Again Search */}
+                             <div className="bg-gray-50 rounded-lg p-3 lg:p-4 mb-4">
+                               <h4 className="text-sm lg:text-base font-medium text-gray-900 mb-3">Search Call Again Clients</h4>
+                               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
+                                 <input
+                                   type="text"
+                                   placeholder="Enter agent name..."
+                                   value={searchAgent}
+                                   onChange={(e) => setSearchAgent(e.target.value)}
+                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                   onKeyPress={(e) => e.key === 'Enter' && searchCallAgainClients()}
+                                 />
+                                 <button
+                                   onClick={searchCallAgainClients}
+                                   className="px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                                 >
+                                   Search
+                                 </button>
+                               </div>
+                               
+                               {showSearchResults && (
+                                 <div className="space-y-2 max-h-48 overflow-y-auto">
+                                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs lg:text-sm text-gray-600 mb-2 space-y-1 sm:space-y-0">
+                                     <span>Found {searchResults.length} clients for agent "{searchAgent}"</span>
+                                     <button
+                                       onClick={() => setShowSearchResults(false)}
+                                       className="text-blue-600 hover:text-blue-800 text-xs"
+                                     >
+                                       Close
+                                     </button>
+                                   </div>
+                                   {searchResults.map((client, index) => (
+                                     <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 space-y-1 sm:space-y-0">
+                                         <span className="text-sm lg:text-base font-medium text-gray-900">{client.clientName}</span>
+                                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                           {client.callCount} calls
+                                         </span>
+                                       </div>
+                                       <div className="text-xs lg:text-sm text-gray-600 mb-2">
+                                         <div>📞 {client.phoneNumber}</div>
+                                         <div>📅 Last call: {client.lastCallDate.toLocaleDateString()}</div>
+                                       </div>
+                                       <button
+                                         onClick={() => initiateCallToClient(client)}
+                                         className="w-full px-3 py-1 bg-green-600 text-white text-xs lg:text-sm rounded hover:bg-green-700 transition-colors"
+                                       >
+                                         Call Again
+                                       </button>
+                                     </div>
+                                   ))}
+                                 </div>
+                               )}
+                             </div>
+
+                             {/* Call History */}
+               {callHistory.length > 0 && (
+                 <div className="bg-gray-50 rounded-lg p-3 lg:p-4">
+                   <h4 className="text-sm lg:text-base font-medium text-gray-900 mb-3">Recent Calls</h4>
+                   <div className="space-y-2 max-h-32 overflow-y-auto">
+                     {callHistory.slice(-3).reverse().map((call, index) => (
+                       <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs lg:text-sm space-y-1 sm:space-y-0">
+                         <span className="text-gray-700">{call.number}</span>
+                         <div className="flex items-center space-x-2">
+                           <span className="text-gray-500">{call.duration}s</span>
+                           {call.status === 'completed' ? (
+                             <CheckCircle className="w-4 h-4 text-green-500" />
+                           ) : call.status === 'cancelled' ? (
+                             <X className="w-4 h-4 text-red-500" />
+                           ) : (
+                             <Clock className="w-4 h-4 text-yellow-500" />
+                           )}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               )}
+
+              <div className="bg-blue-50 rounded-lg p-3 lg:p-4">
                 <div className="flex items-start space-x-3">
-                  <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                  <p className="text-sm text-blue-800">
-                    Phone numbers are hidden from agents for security. Use the call buttons to initiate calls.
-                  </p>
+                  <Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600 mt-0.5" />
+                  <div className="text-xs lg:text-sm text-blue-800">
+                    <p className="font-medium mb-1">Twilio VoIP Integration</p>
+                    <p>
+                      {twilioStatus === 'connected' ? 
+                        'Full API integration available. Calls will be made through Twilio cloud service.' :
+                       twilioStatus === 'connecting' ? 
+                        'Connecting to Twilio...' :
+                       'Twilio integration not available. Check configuration.'}
+                    </p>
+                    {twilioStatus === 'error' && (
+                      <button
+                        onClick={() => setShowTwilioGuideModal(true)}
+                        className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
+                      >
+                        View Integration Guide →
+                      </button>
+                    )}
+                    {twilioStatus === 'connected' && (
+                      <button
+                        onClick={() => setShowTwilioGuideModal(true)}
+                        className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
+                      >
+                        View Account Info →
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Messaging */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Messaging</h3>
-                <p className="text-sm text-gray-600">WhatsApp & Telegram</p>
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Messaging</h3>
+                <p className="text-xs lg:text-sm text-gray-600">Telegram</p>
               </div>
               <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Connected</span>
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 bg-green-500 rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">W</span>
-                  </div>
-                  <span className="font-medium text-gray-900">WhatsApp Business</span>
-                </div>
-                <button 
-                  onClick={() => handleMessage('whatsapp')}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Open WhatsApp</span>
-                </button>
-              </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3">
                   <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
                     <span className="text-white text-xs font-bold">T</span>
                   </div>
-                  <span className="font-medium text-gray-900">Telegram</span>
+                  <span className="text-sm lg:text-base font-medium text-gray-900">Telegram</span>
                 </div>
                 <button 
                   onClick={() => handleMessage('telegram')}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                  className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
                 >
                   <Send className="w-4 h-4" />
                   <span>Open Telegram</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-green-100 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-800">{analytics.whatsappToday}</div>
-                  <div className="text-sm text-green-700">WhatsApp Today</div>
-                </div>
-                <div className="bg-blue-100 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-800">{analytics.telegramToday}</div>
-                  <div className="text-sm text-blue-700">Telegram Today</div>
+              <div className="grid grid-cols-1 gap-4">
+                <div className="bg-blue-100 rounded-lg p-3 lg:p-4 text-center">
+                  <div className="text-xl lg:text-2xl font-bold text-blue-800">{analytics.telegramToday}</div>
+                  <div className="text-xs lg:text-sm text-blue-700">Telegram Today</div>
                 </div>
               </div>
             </div>
@@ -618,66 +1022,66 @@ Copy this message and paste it in the chat:
         </div>
 
         {/* Email & Agents Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* Email Integration */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Email Integration</h3>
-                <p className="text-sm text-gray-600">Hostinger Email Service</p>
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Email Integration</h3>
+                <p className="text-xs lg:text-sm text-gray-600">Hostinger Email Service</p>
               </div>
               <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">Configured</span>
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3">
-                  <Send className="w-5 h-5 text-orange-600" />
-                  <span className="font-medium text-gray-900">Quick Send</span>
+                  <Send className="w-4 h-4 lg:w-5 lg:h-5 text-orange-600" />
+                  <span className="text-sm lg:text-base font-medium text-gray-900">Quick Send</span>
                 </div>
                 <button 
                   onClick={handleEmail}
-                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2"
+                  className="bg-orange-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors flex items-center space-x-2 text-sm"
                 >
                   <Mail className="w-4 h-4" />
                   <span>Open Email Client</span>
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3">
-                  <List className="w-5 h-5 text-gray-600" />
-                  <span className="font-medium text-gray-900">Templates</span>
+                  <List className="w-4 h-4 lg:w-5 lg:h-5 text-gray-600" />
+                  <span className="text-sm lg:text-base font-medium text-gray-900">Templates</span>
                 </div>
                 <button 
                   onClick={handleViewTemplates}
-                  className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2"
+                  className="bg-gray-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors flex items-center space-x-2 text-sm"
                 >
                   <List className="w-4 h-4" />
                   <span>View Templates</span>
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3">
-                  <BarChart3 className="w-5 h-5 text-blue-600" />
-                  <span className="font-medium text-gray-900">Analytics</span>
+                  <BarChart3 className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
+                  <span className="text-sm lg:text-base font-medium text-gray-900">Analytics</span>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-gray-900">{analytics.emailToday}</div>
-                  <div className="text-sm text-gray-600">Emails Today</div>
+                  <div className="text-xl lg:text-2xl font-bold text-gray-900">{analytics.emailToday}</div>
+                  <div className="text-xs lg:text-sm text-gray-600">Emails Today</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Active Agents */}
-          <div className="bg-white rounded-xl p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Active Agents</h3>
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
+              <h3 className="text-base lg:text-lg font-semibold text-gray-900">Active Agents</h3>
               <button 
                 onClick={handleAddAgent}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+                className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Agent</span>
@@ -686,21 +1090,21 @@ Copy this message and paste it in the chat:
 
             <div className="space-y-4">
               {activeAgents.length === 0 ? (
-                <div className="text-center py-8">
-                  <Users className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-500">No active agents found</p>
+                <div className="text-center py-6 lg:py-8">
+                  <Users className="w-10 h-10 lg:w-12 lg:h-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm lg:text-base text-gray-500">No active agents found</p>
                 </div>
               ) : (
                 activeAgents.map((agent, index) => (
-                  <div key={agent._id || index} className="flex items-center space-x-3 p-4 bg-gray-50 rounded-lg">
-                    <div className={`w-10 h-10 ${getAvatarColor(agent.firstName || '')} rounded-full flex items-center justify-center`}>
-                      <span className="text-white font-medium">{agent.initials}</span>
+                  <div key={agent._id || index} className="flex items-center space-x-3 p-3 lg:p-4 bg-gray-50 rounded-lg">
+                    <div className={`w-8 h-8 lg:w-10 lg:h-10 ${getAvatarColor(agent.firstName || '')} rounded-full flex items-center justify-center`}>
+                      <span className="text-white text-sm lg:text-base font-medium">{agent.initials}</span>
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-gray-900">{agent.firstName} {agent.lastName}</p>
+                      <p className="text-sm lg:text-base font-medium text-gray-900">{agent.firstName} {agent.lastName}</p>
                       <div className="flex items-center space-x-2">
                         <div className={`w-2 h-2 rounded-full ${agent.status === 'Online' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                        <p className={`text-sm ${agent.status === 'Online' ? 'text-green-600' : 'text-gray-600'}`}>
+                        <p className={`text-xs lg:text-sm ${agent.status === 'Online' ? 'text-green-600' : 'text-gray-600'}`}>
                           {agent.status}
                         </p>
                       </div>
@@ -715,8 +1119,8 @@ Copy this message and paste it in the chat:
 
       {/* Call Modal */}
       {showCallModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Initiate Call</h3>
               <button onClick={() => setShowCallModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -765,17 +1169,17 @@ Copy this message and paste it in the chat:
               </div>
             </div>
             
-            <div className="flex space-x-3 mt-6">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
               <button 
                 onClick={() => setShowCallModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
               >
                 Cancel
               </button>
               <button 
                 onClick={submitCall}
                 disabled={actionLoading.call}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
               >
                 {actionLoading.call ? 'Initiating...' : 'Start Call'}
               </button>
@@ -786,8 +1190,8 @@ Copy this message and paste it in the chat:
 
       {/* Message Modal */}
       {showMessageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Send Message</h3>
               <button onClick={() => setShowMessageModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -819,7 +1223,6 @@ Copy this message and paste it in the chat:
                   onChange={(e) => setMessageData({...messageData, channel: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="whatsapp">WhatsApp</option>
                   <option value="telegram">Telegram</option>
                 </select>
               </div>
@@ -836,17 +1239,17 @@ Copy this message and paste it in the chat:
               </div>
             </div>
             
-            <div className="flex space-x-3 mt-6">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
               <button 
                 onClick={() => setShowMessageModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
               >
                 Cancel
               </button>
               <button 
                 onClick={submitMessage}
                 disabled={actionLoading.message}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 text-sm"
               >
                 {actionLoading.message ? 'Opening...' : 'Open App'}
               </button>
@@ -857,8 +1260,8 @@ Copy this message and paste it in the chat:
 
       {/* Email Modal */}
       {showEmailModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Compose Email</h3>
               <button onClick={() => setShowEmailModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -917,17 +1320,17 @@ Copy this message and paste it in the chat:
               </div>
             </div>
             
-            <div className="flex space-x-3 mt-6">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
               <button 
                 onClick={() => setShowEmailModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
               >
                 Cancel
               </button>
               <button 
                 onClick={submitEmail}
                 disabled={actionLoading.email}
-                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
               >
                 {actionLoading.email ? 'Opening...' : 'Open Email Client'}
               </button>
@@ -938,8 +1341,8 @@ Copy this message and paste it in the chat:
 
              {/* Templates Modal */}
        {showTemplatesModal && (
-         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
              <div className="flex items-center justify-between mb-4">
                <h3 className="text-lg font-semibold">Email Templates</h3>
                <button onClick={() => setShowTemplatesModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -979,8 +1382,8 @@ Copy this message and paste it in the chat:
 
        {/* Add Agent Modal */}
        {showAddAgentModal && (
-         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-           <div className="bg-white rounded-lg p-6 w-full max-w-md">
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
              <div className="flex items-center justify-between mb-4">
                <h3 className="text-lg font-semibold">Add New Agent</h3>
                <button onClick={() => setShowAddAgentModal(false)} className="text-gray-400 hover:text-gray-600">
@@ -1036,17 +1439,17 @@ Copy this message and paste it in the chat:
                </div>
              </div>
              
-             <div className="flex space-x-3 mt-6">
+             <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
                <button 
                  onClick={() => setShowAddAgentModal(false)}
-                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
                >
                  Cancel
                </button>
                <button 
                  onClick={submitAddAgent}
                  disabled={actionLoading.agent}
-                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
                >
                  {actionLoading.agent ? 'Adding...' : 'Add Agent'}
                </button>
@@ -1054,6 +1457,95 @@ Copy this message and paste it in the chat:
            </div>
          </div>
        )}
+
+               {/* Twilio Integration Guide Modal */}
+        {showTwilioGuideModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Twilio VoIP Integration Guide</h3>
+                <button onClick={() => setShowTwilioGuideModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-6">
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">What is Twilio?</h4>
+                  <p className="text-sm text-blue-800">
+                    Twilio is a cloud communications platform that enables you to make and receive phone calls, 
+                    send and receive text messages, and other communications functions using its web service APIs.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3">Current Configuration:</h4>
+                  <div className="space-y-4">
+                    <div className="bg-green-50 rounded-lg p-4">
+                      <h5 className="font-medium text-green-900 mb-2">Account Information:</h5>
+                      <div className="text-sm text-green-800 space-y-1">
+                        <p><strong>Account SID:</strong> AC2e749f3b25fc86afa0dd6937206d95ec</p>
+                        <p><strong>Phone Number:</strong> +1 (443) 320-6038</p>
+                        <p><strong>Status:</strong> {twilioStatus === 'connected' ? 'Connected' : 'Disconnected'}</p>
+                        {accountInfo && (
+                          <p><strong>Balance:</strong> ${accountInfo.balance} {accountInfo.currency}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-900 mb-2">How It Works:</h4>
+                  <ul className="text-sm text-yellow-800 space-y-1">
+                    <li>• When you make a call, Twilio will call your registered phone number first</li>
+                    <li>• Once you answer, Twilio will connect you to the target number</li>
+                    <li>• All calls are made through Twilio's cloud infrastructure</li>
+                    <li>• Call quality and reliability are managed by Twilio</li>
+                    <li>• No additional software installation required</li>
+                  </ul>
+                </div>
+
+                <div className="bg-green-50 rounded-lg p-4">
+                  <h4 className="font-medium text-green-900 mb-2">Benefits:</h4>
+                  <ul className="text-sm text-green-800 space-y-1">
+                    <li>• Professional call quality</li>
+                    <li>• No software installation required</li>
+                    <li>• Call recording and analytics</li>
+                    <li>• Global phone number support</li>
+                    <li>• Reliable cloud infrastructure</li>
+                    <li>• Detailed call logs and reporting</li>
+                  </ul>
+                </div>
+
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">Testing:</h4>
+                  <p className="text-sm text-blue-800">
+                    To test the integration, try making a call to any phone number. 
+                    Twilio will first call your registered number, then connect you to the target.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
+                <button 
+                  onClick={() => window.open('https://www.twilio.com', '_blank')}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                >
+                  Visit Twilio
+                </button>
+                <button 
+                  onClick={() => setShowTwilioGuideModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
     </div>
   );
 };

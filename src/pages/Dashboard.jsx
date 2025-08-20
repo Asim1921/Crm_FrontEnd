@@ -45,10 +45,12 @@ const Dashboard = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [availableAgents, setAvailableAgents] = useState([]);
   const [selectedAgent, setSelectedAgent] = useState('');
   const [editForm, setEditForm] = useState({});
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -70,14 +72,38 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // Filter clients based on status
+  // Filter clients based on status and agent assignment
   const filteredClients = recentClients.filter(client => {
+    // If user is not admin, only show clients assigned to them
+    if (user?.role !== 'admin') {
+      const isAssignedToUser = client.assignedAgent?._id === user?._id || 
+                              client.assignedAgent?.email === user?.email;
+      if (!isAssignedToUser) return false;
+    }
+    
+    // Apply status filter
     if (statusFilter === 'all') return true;
     return client.status === statusFilter;
   });
 
+  // Debug logging for agent users
+  useEffect(() => {
+    if (user?.role === 'agent') {
+      console.log('Agent User:', user);
+      console.log('Recent Clients:', recentClients);
+      console.log('Filtered Clients:', filteredClients);
+      console.log('User ID:', user._id);
+      console.log('User Email:', user.email);
+    }
+  }, [user, recentClients, filteredClients]);
+
   // Handle status card clicks
   const handleStatusCardClick = (status) => {
+    setStatusFilter(status);
+  };
+
+  // Handle lead status overview clicks
+  const handleLeadStatusClick = (status) => {
     setStatusFilter(status);
   };
 
@@ -159,6 +185,10 @@ const Dashboard = () => {
         });
         setShowEditModal(true);
         break;
+      case 'change-status':
+        setSelectedStatus(client.status);
+        setShowStatusModal(true);
+        break;
       case 'assign':
         try {
           const agents = await clientAPI.getAvailableAgents();
@@ -231,6 +261,24 @@ const Dashboard = () => {
     }
   };
 
+  // Handle status change
+  const handleStatusChange = async () => {
+    try {
+      setActionLoading(true);
+      await clientAPI.updateClient(selectedClient._id, { status: selectedStatus });
+      alert('Client status updated successfully!');
+      setShowStatusModal(false);
+      // Refresh dashboard data
+      const data = await reportsAPI.getDashboardStats();
+      setStats(data);
+      setRecentClients(data.recentClients || []);
+    } catch (error) {
+      alert('Failed to update client status: ' + error.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Handle quick actions
   const handleQuickAction = (action) => {
     switch (action) {
@@ -257,15 +305,17 @@ const Dashboard = () => {
     setShowEditModal(false);
     setShowAssignModal(false);
     setShowDeleteModal(false);
+    setShowStatusModal(false);
     setSelectedClient(null);
     setEditForm({});
     setSelectedAgent('');
+    setSelectedStatus('');
   };
 
   if (loading) {
     return (
       <div className="flex-1 bg-gray-50">
-        <div className="p-6">
+        <div className="p-4 lg:p-6">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
@@ -277,7 +327,7 @@ const Dashboard = () => {
   if (error) {
     return (
       <div className="flex-1 bg-gray-50">
-        <div className="p-6">
+        <div className="p-4 lg:p-6">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <p className="text-red-800">{error}</p>
           </div>
@@ -290,84 +340,96 @@ const Dashboard = () => {
     <div className="flex-1 bg-gray-50">
       
       {/* Main Content */}
-      <div className="p-6">
+      <div className="p-4 lg:p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
           <div 
-            className="bg-white rounded-xl p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-white rounded-xl p-4 lg:p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleStatusCardClick('all')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Clients</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalClients.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">Total Clients</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.totalClients.value}</p>
                 <p className={`text-xs ${stats.totalClients.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {stats.totalClients.change} from last month
                 </p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 lg:w-6 lg:h-6 text-blue-600" />
               </div>
             </div>
           </div>
 
           <div 
-            className="bg-white rounded-xl p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-white rounded-xl p-4 lg:p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleStatusCardClick('New Lead')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">New Leads</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-xs lg:text-sm font-medium text-gray-600">New Leads</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">
                   {stats.leadStatusOverview?.find(s => s._id === 'New Lead')?.count || 0}
                 </p>
                 <p className="text-xs text-green-600">Active leads</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Plus className="w-6 h-6 text-green-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <Plus className="w-5 h-5 lg:w-6 lg:h-6 text-green-600" />
               </div>
             </div>
           </div>
 
           <div 
-            className="bg-white rounded-xl p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            className="bg-white rounded-xl p-4 lg:p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleStatusCardClick('FTD')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">FTD</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.ftdThisMonth.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">FTD</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.ftdThisMonth.value}</p>
                 <p className={`text-xs ${stats.ftdThisMonth.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {stats.ftdThisMonth.change} conversion
                 </p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-purple-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-sm">
+          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Pending Tasks</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingTasks.value}</p>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">Pending Tasks</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.pendingTasks.value}</p>
                 <p className="text-xs text-gray-600">{stats.pendingTasks.overdue} overdue</p>
               </div>
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                <ClipboardList className="w-6 h-6 text-orange-600" />
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                <ClipboardList className="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Charts and Tables */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* Recent Clients */}
           <div className="lg:col-span-2 bg-white rounded-xl shadow-sm">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900">Recent Clients</h2>
+            <div className="p-4 lg:p-6 border-b border-gray-200">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
+                <div className="flex items-center space-x-2">
+                  <h2 className="text-base lg:text-lg font-semibold text-gray-900">Recent Clients</h2>
+                  {statusFilter !== 'all' && (
+                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                      Filtered by: {statusFilter}
+                    </span>
+                  )}
+                  {user?.role !== 'admin' && (
+                    <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                      My Clients Only
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center space-x-2">
                   <button 
                     className={`px-3 py-1 text-sm rounded-lg transition-colors ${
@@ -410,32 +472,41 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CONTACT</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AGENT</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CONTACT</th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AGENT</th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredClients.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
-                        No clients found for the selected filter
-                      </td>
-                    </tr>
-                  ) : (
+                                     {filteredClients.length === 0 ? (
+                     <tr>
+                       <td colSpan="5" className="px-4 lg:px-6 py-4 text-center text-gray-500">
+                         {user?.role === 'agent' ? (
+                           <div className="space-y-2">
+                             <p>No clients assigned to you yet.</p>
+                             <p className="text-xs text-gray-400">
+                               Demo credentials: agent@example.com, agent2@example.com, or agent3@example.com
+                             </p>
+                           </div>
+                         ) : (
+                           'No clients found for the selected filter'
+                         )}
+                       </td>
+                     </tr>
+                   ) : (
                     filteredClients.map((client) => (
                       <tr key={client._id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.country}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.country}</td>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{client.firstName} {client.lastName}</div>
                           <div className="text-sm text-gray-500">{client.phone}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             client.status === 'New Lead' ? 'bg-green-100 text-green-800' :
                             client.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
@@ -445,10 +516,10 @@ const Dashboard = () => {
                             {client.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <div className="flex items-center space-x-2">
                             <button 
                               className="text-blue-600 hover:text-blue-900 transition-colors"
@@ -464,49 +535,74 @@ const Dashboard = () => {
                             >
                               <Mail className="w-4 h-4" />
                             </button>
-                            <div className="relative">
-                              <button 
-                                className="text-gray-600 hover:text-gray-900 transition-colors"
-                                onClick={() => setShowMenu(showMenu === client._id ? null : client._id)}
-                                title="More options"
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </button>
-                              {showMenu === client._id && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                                  <div className="py-1">
-                                    <button
-                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                      onClick={() => handleMenuAction('view', client)}
-                                    >
-                                      <FileText className="w-4 h-4 mr-2" />
-                                      View Details
-                                    </button>
-                                    <button
-                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                      onClick={() => handleMenuAction('edit', client)}
-                                    >
-                                      <Edit className="w-4 h-4 mr-2" />
-                                      Edit Client
-                                    </button>
-                                    <button
-                                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                      onClick={() => handleMenuAction('assign', client)}
-                                    >
-                                      <Users className="w-4 h-4 mr-2" />
-                                      Assign Agent
-                                    </button>
-                                    <button
-                                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                      onClick={() => handleMenuAction('delete', client)}
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Delete
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
+                                                         <div className="relative">
+                               <button 
+                                 className="text-gray-600 hover:text-gray-900 transition-colors"
+                                 onClick={(e) => {
+                                   e.stopPropagation();
+                                   setShowMenu(showMenu === client._id ? null : client._id);
+                                 }}
+                                 title="More options"
+                               >
+                                 <MoreHorizontal className="w-4 h-4" />
+                               </button>
+                               {showMenu === client._id && (
+                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+                                   <div className="py-1">
+                                     <button
+                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         handleMenuAction('view', client);
+                                       }}
+                                     >
+                                       <FileText className="w-4 h-4 mr-2" />
+                                       View Details
+                                     </button>
+                                     <button
+                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         handleMenuAction('edit', client);
+                                       }}
+                                     >
+                                       <Edit className="w-4 h-4 mr-2" />
+                                       Edit Client
+                                     </button>
+                                     <button
+                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         handleMenuAction('change-status', client);
+                                       }}
+                                     >
+                                       <Tag className="w-4 h-4 mr-2" />
+                                       Change Status
+                                     </button>
+                                     <button
+                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         handleMenuAction('assign', client);
+                                       }}
+                                     >
+                                       <Users className="w-4 h-4 mr-2" />
+                                       Assign Agent
+                                     </button>
+                                     <button
+                                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                       onClick={(e) => {
+                                         e.stopPropagation();
+                                         handleMenuAction('delete', client);
+                                       }}
+                                     >
+                                       <Trash2 className="w-4 h-4 mr-2" />
+                                       Delete
+                                     </button>
+                                   </div>
+                                 </div>
+                               )}
+                             </div>
                           </div>
                         </td>
                       </tr>
@@ -521,10 +617,42 @@ const Dashboard = () => {
           <div className="space-y-6">
             {/* Lead Status Overview */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Lead Status Overview</h3>
+                {statusFilter !== 'all' && (
+                  <button
+                    onClick={() => setStatusFilter('all')}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Clear Filter
+                  </button>
+                )}
+              </div>
               <div className="space-y-3">
+                {statusFilter !== 'all' && (
+                  <div 
+                    className="flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors hover:bg-gray-50"
+                    onClick={() => setStatusFilter('all')}
+                  >
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 rounded-full mr-3 bg-gray-400"></div>
+                      <span className="text-sm text-gray-700">Show All</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {stats.leadStatusOverview.reduce((total, status) => total + status.count, 0)}
+                    </span>
+                  </div>
+                )}
                 {stats.leadStatusOverview && stats.leadStatusOverview.map((status) => (
-                  <div key={status._id} className="flex items-center justify-between">
+                  <div 
+                    key={status._id} 
+                    className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                      statusFilter === status._id 
+                        ? 'bg-blue-50 border border-blue-200' 
+                        : 'hover:bg-gray-50'
+                    }`}
+                    onClick={() => handleLeadStatusClick(status._id)}
+                  >
                     <div className="flex items-center">
                       <div className={`w-3 h-3 rounded-full mr-3 ${
                         status._id === 'New Lead' ? 'bg-green-500' :
@@ -535,9 +663,13 @@ const Dashboard = () => {
                         status._id === 'Hang Up' ? 'bg-purple-500' :
                         'bg-gray-400'
                       }`}></div>
-                      <span className="text-sm text-gray-700">{status._id}</span>
+                      <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                        {status._id}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-gray-900">{status.count}</span>
+                    <span className={`text-sm font-medium ${statusFilter === status._id ? 'text-blue-700' : 'text-gray-900'}`}>
+                      {status.count}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -589,13 +721,13 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Click outside to close menu */}
-      {showMenu && (
-        <div 
-          className="fixed inset-0 z-0" 
-          onClick={() => setShowMenu(null)}
-        />
-      )}
+             {/* Click outside to close menu */}
+       {showMenu && (
+         <div 
+           className="fixed inset-0 z-40" 
+           onClick={() => setShowMenu(null)}
+         />
+       )}
 
       {/* Client Details Modal */}
       {showDetailsModal && selectedClient && (
@@ -871,8 +1003,72 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Change Status Modal */}
+      {showStatusModal && selectedClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Change Client Status</h2>
+              <button onClick={closeAllModals} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Client: <span className="font-medium">{selectedClient.firstName} {selectedClient.lastName}</span>
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                Current Status: <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                  selectedClient.status === 'New Lead' ? 'bg-green-100 text-green-800' :
+                  selectedClient.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
+                  selectedClient.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
+                  selectedClient.status === 'No Answer' ? 'bg-red-100 text-red-800' :
+                  selectedClient.status === 'Not Interested' ? 'bg-gray-100 text-gray-800' :
+                  selectedClient.status === 'Hang Up' ? 'bg-purple-100 text-purple-800' :
+                  'bg-gray-100 text-gray-800'
+                }`}>
+                  {selectedClient.status}
+                </span>
+              </p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">New Status</label>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">Select Status</option>
+                <option value="New Lead">New Lead</option>
+                <option value="Call Again">Call Again</option>
+                <option value="No Answer">No Answer</option>
+                <option value="Not Interested">Not Interested</option>
+                <option value="Hang Up">Hang Up</option>
+                <option value="FTD">FTD</option>
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={closeAllModals}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={actionLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleStatusChange}
+                disabled={actionLoading || !selectedStatus}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {actionLoading ? 'Updating...' : 'Update Status'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default Dashboard;
+
+

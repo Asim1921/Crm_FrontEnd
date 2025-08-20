@@ -39,13 +39,6 @@ export const authAPI = {
     });
   },
 
-  register: async (userData) => {
-    return apiRequest('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify(userData)
-    });
-  },
-
   getMe: async () => {
     return apiRequest('/auth/me');
   }
@@ -207,6 +200,17 @@ export const userAPI = {
       method: 'PUT',
       body: JSON.stringify(passwordData)
     });
+  },
+
+  createUser: async (userData) => {
+    return apiRequest('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  getUsers: async () => {
+    return apiRequest('/users');
   }
 };
 

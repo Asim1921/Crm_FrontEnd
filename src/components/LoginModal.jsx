@@ -22,21 +22,21 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md mx-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl p-6 lg:p-8 w-full max-w-md mx-4">
         {/* Icon */}
-        <div className="flex justify-center mb-6">
-          <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center">
-            <LogIn className="w-8 h-8 text-white" />
+        <div className="flex justify-center mb-4 lg:mb-6">
+          <div className="w-12 h-12 lg:w-16 lg:h-16 bg-red-500 rounded-full flex items-center justify-center">
+            <LogIn className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
           </div>
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">Login</h2>
-        <p className="text-gray-600 text-center mb-8">Login with username and Password</p>
+        <h2 className="text-xl lg:text-2xl font-bold text-gray-900 text-center mb-2">Login</h2>
+        <p className="text-sm lg:text-base text-gray-600 text-center mb-6 lg:mb-8">Login with username and Password</p>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-6">
           <div>
             <input
               type="text"
@@ -44,7 +44,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
               placeholder="username"
               value={formData.username}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               required
             />
           </div>
@@ -56,7 +56,7 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
               required
             />
           </div>
@@ -64,25 +64,14 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-red-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center space-x-2"
+            className="w-full bg-red-500 text-white font-bold py-2 lg:py-3 px-3 lg:px-4 text-sm lg:text-base rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center space-x-2"
           >
-            <ArrowRight className="w-5 h-5" />
+            <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />
             <span>Yes, Sign in</span>
           </button>
         </form>
 
-        {/* Register Link */}
-        <div className="mt-6 text-center">
-          <p className="text-gray-600">
-            Don't have an account?{' '}
-            <button
-              onClick={() => window.location.href = '/register'}
-              className="text-blue-500 hover:text-blue-600 font-medium"
-            >
-              Sign up here
-            </button>
-          </p>
-        </div>
+
       </div>
     </div>
   );

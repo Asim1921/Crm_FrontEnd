@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clientAPI, reportsAPI } from '../utils/api';
+import { useNotifications } from '../context/NotificationContext';
 import { 
   Search, 
   Filter, 
@@ -20,6 +21,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 
 const ClientManagement = () => {
   const navigate = useNavigate();
+  const { addClientNotification } = useNotifications();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -265,7 +267,12 @@ const ClientManagement = () => {
   // Handle add new client
   const handleAddClient = async () => {
     try {
-      await clientAPI.createClient(newClient);
+      const response = await clientAPI.createClient(newClient);
+      const clientName = `${newClient.firstName} ${newClient.lastName}`;
+      
+      // Add notification for new client
+      addClientNotification('created', clientName, response._id || 'new-client');
+      
       alert('Client added successfully!');
       setShowAddModal(false);
       setNewClient({
@@ -303,28 +310,7 @@ const ClientManagement = () => {
     }, 100);
   };
 
-  // Handle WhatsApp message
-  const handleWhatsApp = (client) => {
-    if (!client.phone) {
-      alert('Client phone number not found');
-      return;
-    }
-    
-    // Format phone number (remove any non-digit characters)
-    const phoneNumber = client.phone.replace(/\D/g, '');
-    
-    // Default message
-    const defaultMessage = `Hi ${client.firstName}, I hope you're doing well. I wanted to follow up on our previous conversation.`;
-    
-    // Open WhatsApp with pre-filled message
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(defaultMessage)}`;
-    window.open(whatsappUrl, '_blank');
-    
-    // Show success message
-    setTimeout(() => {
-      alert(`WhatsApp opened for ${client.firstName} ${client.lastName} with pre-filled message`);
-    }, 100);
-  };
+
 
   // Handle email client
   const handleEmail = (client) => {
@@ -390,88 +376,93 @@ const ClientManagement = () => {
            item._id === 'Hang Up' ? 'bg-purple-500' : 'bg-gray-400'
   }));
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+     if (loading) {
+     return (
+       <div className="flex items-center justify-center h-64 p-4">
+         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+       </div>
+     );
+   }
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-800">{error}</p>
-        </div>
-      </div>
-    );
-  }
+   if (error) {
+     return (
+       <div className="flex items-center justify-center h-64 p-4">
+         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+           <p className="text-red-800">{error}</p>
+         </div>
+       </div>
+     );
+   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="p-4 lg:p-6 bg-gray-50 min-h-screen">
       {/* Top Filter Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-4 space-y-4 lg:space-y-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+          <div className="relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search clients..."
               value={searchTerm}
               onChange={handleSearch}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-64"
             />
           </div>
-          <select 
-            value={countryFilter}
-            onChange={(e) => setCountryFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Countries</option>
-            {availableCountries.map((country) => (
-              <option key={country} value={country}>
-                {country}
-              </option>
-            ))}
-          </select>
-          <select 
-            value={agentFilter}
-            onChange={(e) => setAgentFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Agents</option>
-            <option value="agent1">Agent 1</option>
-            <option value="agent2">Agent 2</option>
-          </select>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+            <select 
+              value={countryFilter}
+              onChange={(e) => setCountryFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="all">All Countries</option>
+              {availableCountries.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
+              ))}
+            </select>
+            <select 
+              value={agentFilter}
+              onChange={(e) => setAgentFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="all">All Agents</option>
+              <option value="agent1">Agent 1</option>
+              <option value="agent2">Agent 2</option>
+            </select>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
           <button 
             onClick={() => setShowImportModal(true)}
-            className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+            className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
           >
             <Upload className="w-4 h-4 mr-2" />
-            Import Excel
+            <span className="hidden sm:inline">Import Excel</span>
+            <span className="sm:hidden">Import</span>
           </button>
           <button 
             onClick={handleExportClients}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
           >
             <Download className="w-4 h-4 mr-2" />
-            Export Excel
+            <span className="hidden sm:inline">Export Excel</span>
+            <span className="sm:hidden">Export</span>
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
           >
             <Plus className="w-4 h-4 mr-2" />
-            Add Client
+            <span className="hidden sm:inline">Add Client</span>
+            <span className="sm:hidden">Add</span>
           </button>
         </div>
       </div>
 
       {/* Assignment Bar */}
-      <div className="flex items-center space-x-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
         <div className="flex items-center space-x-2">
           <input 
             type="checkbox" 
@@ -484,7 +475,7 @@ const ClientManagement = () => {
             Select All
           </label>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
           <span className="text-sm text-gray-700 font-medium">Assign to:</span>
           <select 
             value={assignToAgent}
@@ -512,10 +503,10 @@ const ClientManagement = () => {
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[800px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left">
+                  <th className="px-4 lg:px-6 py-3 text-left">
                     <input 
                       type="checkbox" 
                       checked={selectAll}
@@ -523,53 +514,53 @@ const ClientManagement = () => {
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {clients.map((client) => (
                   <tr key={client._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <input 
-                        type="checkbox" 
-                        checked={selectedClients.has(client._id)}
-                        onChange={(e) => handleClientSelect(client._id, e.target.checked)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(client.firstName + client.lastName)}`}>
-                          {getInitials(client.firstName, client.lastName)}
-                        </div>
-                        <div className="ml-3">
-                          <button
-                            onClick={() => navigate(`/clients/${client._id}`)}
-                            className="text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
-                          >
-                            {client.firstName} {client.lastName}
-                          </button>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.country}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.phone}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.email}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
-                        {client.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                         <td className="px-4 lg:px-6 py-4">
+                       <input 
+                         type="checkbox" 
+                         checked={selectedClients.has(client._id)}
+                         onChange={(e) => handleClientSelect(client._id, e.target.checked)}
+                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                       />
+                     </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                       <div className="flex items-center">
+                         <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-white text-xs lg:text-sm font-medium ${getAvatarColor(client.firstName + client.lastName)}`}>
+                           {getInitials(client.firstName, client.lastName)}
+                         </div>
+                         <div className="ml-2 lg:ml-3">
+                           <button
+                             onClick={() => navigate(`/clients/${client._id}`)}
+                             className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
+                           >
+                             {client.firstName} {client.lastName}
+                           </button>
+                         </div>
+                       </div>
+                     </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.country}</td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.phone}</td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.email}</td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
+                       {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
+                     </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
+                         {client.status}
+                       </span>
+                     </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button 
                           onClick={() => handleCall(client)}
@@ -578,13 +569,7 @@ const ClientManagement = () => {
                         >
                           <Phone className="w-4 h-4" />
                         </button>
-                        <button 
-                          onClick={() => handleWhatsApp(client)}
-                          className="text-gray-400 hover:text-green-600 transition-colors"
-                          title="Send WhatsApp message"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
+
                         <button 
                           onClick={() => handleEmail(client)}
                           className="text-gray-400 hover:text-orange-600 transition-colors"
@@ -600,55 +585,55 @@ const ClientManagement = () => {
             </table>
           </div>
           
-          {/* Pagination */}
-          <div className="px-6 py-3 border-t border-gray-200 bg-white">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
-                Showing {((pagination.current - 1) * 5) + 1} to {Math.min(pagination.current * 5, analytics.totalClients)} of {analytics.totalClients} results
-              </div>
-              <div className="flex items-center space-x-2">
-                <button 
-                  onClick={() => setCurrentPage(pagination.current - 1)}
-                  disabled={!pagination.hasPrev}
-                  className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Previous
-                </button>
-                {Array.from({ length: Math.min(5, pagination.total) }, (_, i) => {
-                  const pageNum = i + 1;
-                  return (
-                    <button 
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1 text-sm rounded ${
-                        pageNum === pagination.current 
-                          ? 'bg-blue-600 text-white' 
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-                <button 
-                  onClick={() => setCurrentPage(pagination.current + 1)}
-                  disabled={!pagination.hasNext}
-                  className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          </div>
+                     {/* Pagination */}
+           <div className="px-4 lg:px-6 py-3 border-t border-gray-200 bg-white">
+             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+               <div className="text-xs lg:text-sm text-gray-700 text-center sm:text-left">
+                 Showing {((pagination.current - 1) * 5) + 1} to {Math.min(pagination.current * 5, analytics.totalClients)} of {analytics.totalClients} results
+               </div>
+               <div className="flex items-center justify-center space-x-1 lg:space-x-2">
+                 <button 
+                   onClick={() => setCurrentPage(pagination.current - 1)}
+                   disabled={!pagination.hasPrev}
+                   className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   Previous
+                 </button>
+                 {Array.from({ length: Math.min(5, pagination.total) }, (_, i) => {
+                   const pageNum = i + 1;
+                   return (
+                     <button 
+                       key={pageNum}
+                       onClick={() => setCurrentPage(pageNum)}
+                       className={`px-2 lg:px-3 py-1 text-xs lg:text-sm rounded ${
+                         pageNum === pagination.current 
+                           ? 'bg-blue-600 text-white' 
+                           : 'text-gray-500 hover:text-gray-700'
+                       }`}
+                     >
+                       {pageNum}
+                     </button>
+                   );
+                 })}
+                 <button 
+                   onClick={() => setCurrentPage(pagination.current + 1)}
+                   disabled={!pagination.hasNext}
+                   className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                 >
+                   Next
+                 </button>
+               </div>
+             </div>
+           </div>
         </div>
       </div>
 
-      {/* Charts Row - Below the table */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* Clients by Country */}
-        <div className="bg-white rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Clients by Country</h3>
-          <div className="h-64">
+             {/* Charts Row - Below the table */}
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
+                 {/* Clients by Country */}
+         <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+           <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Country</h3>
+           <div className="h-48 lg:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -670,10 +655,10 @@ const ClientManagement = () => {
           </div>
         </div>
 
-        {/* Engagement Metrics */}
-        <div className="bg-white rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Engagement Metrics</h3>
-          <div className="h-64">
+                 {/* Engagement Metrics */}
+         <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+           <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Engagement Metrics</h3>
+           <div className="h-48 lg:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barChartData}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -687,9 +672,9 @@ const ClientManagement = () => {
         </div>
       </div>
 
-      {/* Lead Status Overview - Below the charts */}
-      <div className="bg-white rounded-lg p-6 shadow-sm">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
+             {/* Lead Status Overview - Below the charts */}
+       <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+         <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
         {leadStatusData.map((item, index) => (
           <div key={item.status} className="flex items-center justify-between mb-4">
             <div className="flex items-center">
@@ -712,10 +697,10 @@ const ClientManagement = () => {
         </div>
       </div>
 
-      {/* Add Client Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+             {/* Add Client Modal */}
+       {showAddModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Add New Client</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -808,10 +793,10 @@ const ClientManagement = () => {
         </div>
       )}
 
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+             {/* Import Modal */}
+       {showImportModal && (
+         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">Import Clients</h3>
               <button onClick={() => setShowImportModal(false)} className="text-gray-500 hover:text-gray-700">

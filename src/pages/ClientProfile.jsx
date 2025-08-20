@@ -78,18 +78,7 @@ const ClientProfile = () => {
     window.open(telUrl, '_self');
   };
 
-  // Handle WhatsApp message
-  const handleWhatsApp = () => {
-    if (!client?.phone) {
-      alert('Client phone number not found');
-      return;
-    }
-    
-    const phoneNumber = client.phone.replace(/\D/g, '');
-    const defaultMessage = `Hi ${client.firstName}, I hope you're doing well. I wanted to follow up on our previous conversation.`;
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodeURIComponent(defaultMessage)}`;
-    window.open(whatsappUrl, '_blank');
-  };
+
 
   // Handle email client
   const handleEmail = () => {
@@ -293,14 +282,7 @@ const ClientProfile = () => {
                   <Phone className="w-4 h-4" />
                   <span className="text-sm">Call</span>
                 </button>
-                <button
-                  onClick={handleWhatsApp}
-                  className="flex items-center space-x-2 text-gray-600 hover:text-green-600 transition-colors"
-                  title="WhatsApp"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  <span className="text-sm">WhatsApp</span>
-                </button>
+
                 <button
                   onClick={handleEmail}
                   className="flex items-center space-x-2 text-gray-600 hover:text-purple-600 transition-colors"
