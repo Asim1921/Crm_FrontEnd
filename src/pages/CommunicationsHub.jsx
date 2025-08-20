@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { communicationAPI, clientAPI } from '../utils/api';
 import twilioAPI from '../utils/twilioAPI';
-import telegramAPI from '../utils/telegramAPI';
+
 
 const CommunicationsHub = () => {
   const { user } = useAuth();
@@ -34,7 +34,6 @@ const CommunicationsHub = () => {
     onlineAgents: { value: 0, total: 0, percentage: 0 }
   });
   const [analytics, setAnalytics] = useState({
-    telegramToday: 0,
     emailToday: 0
   });
   const [activeAgents, setActiveAgents] = useState([]);
@@ -52,7 +51,7 @@ const CommunicationsHub = () => {
   
   // Form states
   const [callData, setCallData] = useState({ clientId: '', phoneNumber: '', channel: 'voip' });
-  const [messageData, setMessageData] = useState({ clientId: '', content: '', channel: 'telegram' });
+  const [messageData, setMessageData] = useState({ clientId: '', content: '', channel: 'email' });
   const [emailData, setEmailData] = useState({ clientId: '', subject: '', content: '', email: '' });
   const [agentData, setAgentData] = useState({ firstName: '', lastName: '', email: '', role: 'agent' });
   
@@ -182,15 +181,6 @@ Best regards,
         
         setTwilioStatus('connected');
         
-        // Show success message
-        alert(`📞 Call Initiated Successfully!
-
-✅ Twilio call started to: ${twilioAPI.formatPhoneNumber(validatedNumber)}
-📞 Call SID: ${callResult.callSid}
-📊 Status: ${callResult.status}
-
-The call is now being processed by Twilio. You should receive a call on your registered phone number shortly.`);
-        
         // Add notification
         addCallNotification({
           type: 'outgoing',
@@ -306,7 +296,7 @@ The call is now being processed by Twilio. You should receive a call on your reg
     setShowCallModal(true);
   };
 
-  const handleMessage = async (channel = 'telegram') => {
+  const handleMessage = async (channel = 'email') => {
     setMessageData({ ...messageData, channel });
     setShowMessageModal(true);
   };
@@ -569,35 +559,14 @@ Choose "OK" for Anonymous Mode or "Cancel" for Direct Mode.`);
   // New function for anonymous Telegram messaging
   const sendAnonymousTelegramMessage = async (client, messageContent) => {
     try {
-      // This would typically call a backend API that handles Telegram Bot API
-      // For now, we'll simulate the process and provide setup instructions
+      // Use real API with the configured bot
+      const messageData = telegramAPI.formatAnonymousMessage(client, messageContent, user);
+      const result = await telegramAPI.sendAnonymousMessage(messageData);
       
-      const clientName = `${client.firstName} ${client.lastName}`;
-      const phoneNumber = client.phone.replace(/\D/g, '');
-      
-      // Simulate API call to backend
-      const response = await fetch('/api/telegram/send-anonymous', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          clientId: client._id,
-          clientName: clientName,
-          phoneNumber: phoneNumber,
-          message: messageContent,
-          agentId: user._id,
-          agentName: `${user.firstName} ${user.lastName}`
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`✅ Anonymous Telegram Message Sent Successfully!
+      alert(`✅ Anonymous Telegram Message Sent Successfully!
 
 📱 **Message Details:**
-👤 To: ${clientName}
+👤 To: ${client.firstName} ${client.lastName}
 📝 Message: "${messageContent.substring(0, 50)}${messageContent.length > 50 ? '...' : ''}"
 🔒 Mode: Anonymous (Phone number hidden)
 🤖 Sent via: Telegram Bot
@@ -607,57 +576,39 @@ Choose "OK" for Anonymous Mode or "Cancel" for Direct Mode.`);
 - Only the client's name is visible, not their phone number
 - The message appears to come from your company, not a personal number
 - Complete privacy protection for both parties`);
-      } else {
-        // Fallback to setup instructions if API is not available
-        showTelegramBotSetupInstructions(client, messageContent);
-      }
+      
     } catch (error) {
       console.error('Telegram Bot API error:', error);
-      // Fallback to setup instructions
-      showTelegramBotSetupInstructions(client, messageContent);
+      
+      // Show helpful error message
+      const clientName = `${client.firstName} ${client.lastName}`;
+      alert(`❌ Telegram Bot Error: ${error.message}
+
+🔧 **Possible Solutions:**
+
+1. **Bot Not Configured:**
+   - Add TELEGRAM_BOT_TOKEN to your .env file
+   - Restart your backend server
+
+2. **Client Not Found:**
+   - The client needs to search for your bot in Telegram
+   - Send /start to your bot first
+   - Then try sending the message again
+
+3. **Invalid Token:**
+   - Check your bot token in .env file
+   - Make sure it's the correct token from BotFather
+
+💡 **For now, using direct Telegram approach...**`);
+      
+      // Fallback to direct approach
+      setTimeout(() => {
+        sendDirectTelegramMessage(client, messageContent);
+      }, 1000);
     }
   };
 
-  // Function to show Telegram Bot setup instructions
-  const showTelegramBotSetupInstructions = (client, messageContent) => {
-    const clientName = `${client.firstName} ${client.lastName}`;
-    const phoneNumber = client.phone.replace(/\D/g, '');
-    
-    const instructions = `🔧 **Telegram Bot Setup Required**
 
-To enable anonymous messaging where client phone numbers are hidden, you need to set up a Telegram Bot:
-
-📋 **Step 1: Create Telegram Bot**
-1. Open Telegram and search for "@BotFather"
-2. Send: /newbot
-3. Follow instructions to create your bot
-4. Save the bot token (looks like: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz)
-
-📋 **Step 2: Configure Backend**
-Add to your backend .env file:
-TELEGRAM_BOT_TOKEN=your_bot_token_here
-TELEGRAM_BOT_USERNAME=your_bot_username
-
-📋 **Step 3: Backend API Setup**
-Create endpoint: POST /api/telegram/send-anonymous
-This will handle sending messages through the bot API
-
-💡 **Benefits of Bot Approach:**
-✅ Client phone numbers remain hidden
-✅ Only client names are visible
-✅ Professional company branding
-✅ Better privacy protection
-✅ Automated message delivery
-
-📱 **For now, using direct Telegram approach...**`;
-    
-    alert(instructions);
-    
-    // Fallback to direct approach
-    setTimeout(() => {
-      sendDirectTelegramMessage(client, messageContent);
-    }, 1000);
-  };
 
   // Function for direct Telegram messaging (current approach)
   const sendDirectTelegramMessage = async (client, messageContent) => {
@@ -880,7 +831,7 @@ Copy this message and paste it in the chat:
         </div>
 
         {/* Integrations Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
           {/* VoIP Integration */}
           <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
@@ -1000,60 +951,7 @@ Copy this message and paste it in the chat:
                  </div>
                )}
 
-                             {/* Call Again Search */}
-                             <div className="bg-gray-50 rounded-lg p-3 lg:p-4 mb-4">
-                               <h4 className="text-sm lg:text-base font-medium text-gray-900 mb-3">Search Call Again Clients</h4>
-                               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
-                                 <input
-                                   type="text"
-                                   placeholder="Enter agent name..."
-                                   value={searchAgent}
-                                   onChange={(e) => setSearchAgent(e.target.value)}
-                                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                   onKeyPress={(e) => e.key === 'Enter' && searchCallAgainClients()}
-                                 />
-                                 <button
-                                   onClick={searchCallAgainClients}
-                                   className="px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-                                 >
-                                   Search
-                                 </button>
-                               </div>
-                               
-                               {showSearchResults && (
-                                 <div className="space-y-2 max-h-48 overflow-y-auto">
-                                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs lg:text-sm text-gray-600 mb-2 space-y-1 sm:space-y-0">
-                                     <span>Found {searchResults.length} clients for agent "{searchAgent}"</span>
-                                     <button
-                                       onClick={() => setShowSearchResults(false)}
-                                       className="text-blue-600 hover:text-blue-800 text-xs"
-                                     >
-                                       Close
-                                     </button>
-                                   </div>
-                                   {searchResults.map((client, index) => (
-                                     <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
-                                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 space-y-1 sm:space-y-0">
-                                         <span className="text-sm lg:text-base font-medium text-gray-900">{client.clientName}</span>
-                                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                           {client.callCount} calls
-                                         </span>
-                                       </div>
-                                       <div className="text-xs lg:text-sm text-gray-600 mb-2">
-                                         <div>📞 {client.phoneNumber}</div>
-                                         <div>📅 Last call: {client.lastCallDate.toLocaleDateString()}</div>
-                                       </div>
-                                       <button
-                                         onClick={() => initiateCallToClient(client)}
-                                         className="w-full px-3 py-1 bg-green-600 text-white text-xs lg:text-sm rounded hover:bg-green-700 transition-colors"
-                                       >
-                                         Call Again
-                                       </button>
-                                     </div>
-                                   ))}
-                                 </div>
-                               )}
-                             </div>
+
 
                              {/* Call History */}
                {callHistory.length > 0 && (
@@ -1113,47 +1011,6 @@ Copy this message and paste it in the chat:
             </div>
           </div>
 
-          {/* Messaging */}
-          <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
-              <div>
-                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Messaging</h3>
-                <p className="text-xs lg:text-sm text-gray-600">Telegram</p>
-              </div>
-              <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">Connected</span>
-            </div>
-
-            <div className="space-y-4">
-
-
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
-                <div className="flex items-center space-x-3">
-                  <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">T</span>
-                  </div>
-                  <span className="text-sm lg:text-base font-medium text-gray-900">Telegram</span>
-                </div>
-                <button 
-                  onClick={() => handleMessage('telegram')}
-                  className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm"
-                >
-                  <Send className="w-4 h-4" />
-                  <span>Open Telegram</span>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <div className="bg-blue-100 rounded-lg p-3 lg:p-4 text-center">
-                  <div className="text-xl lg:text-2xl font-bold text-blue-800">{analytics.telegramToday}</div>
-                  <div className="text-xs lg:text-sm text-blue-700">Telegram Today</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Email & Agents Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* Email Integration */}
           <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
@@ -1240,12 +1097,80 @@ Copy this message and paste it in the chat:
                         </p>
                       </div>
                     </div>
+                    <div className="text-right">
+                      <p className="text-xs lg:text-sm text-gray-600">{agent.role}</p>
+                      <p className="text-xs text-gray-500">{agent.lastSeen}</p>
+                    </div>
                   </div>
                 ))
               )}
             </div>
           </div>
         </div>
+
+        {/* Call Again Search Section */}
+        <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
+            <div>
+              <h3 className="text-base lg:text-lg font-semibold text-gray-900">Call Again Search</h3>
+              <p className="text-xs lg:text-sm text-gray-600">Find clients to call back</p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-3 lg:p-4">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mb-3">
+              <input
+                type="text"
+                placeholder="Enter agent name to search their clients..."
+                value={searchAgent}
+                onChange={(e) => setSearchAgent(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                onKeyPress={(e) => e.key === 'Enter' && searchCallAgainClients()}
+              />
+              <button
+                onClick={searchCallAgainClients}
+                className="px-3 lg:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+              >
+                Search
+              </button>
+            </div>
+            
+            {showSearchResults && (
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs lg:text-sm text-gray-600 mb-2 space-y-1 sm:space-y-0">
+                  <span>Found {searchResults.length} clients for agent "{searchAgent}"</span>
+                  <button
+                    onClick={() => setShowSearchResults(false)}
+                    className="text-blue-600 hover:text-blue-800 text-xs"
+                  >
+                    Close
+                  </button>
+                </div>
+                {searchResults.map((client, index) => (
+                  <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-2 space-y-1 sm:space-y-0">
+                      <span className="text-sm lg:text-base font-medium text-gray-900">{client.clientName}</span>
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                        {client.callCount} calls
+                      </span>
+                    </div>
+                    <div className="text-xs lg:text-sm text-gray-600 mb-2">
+                      <div>📞 {client.phoneNumber}</div>
+                      <div>📅 Last call: {client.lastCallDate.toLocaleDateString()}</div>
+                    </div>
+                    <button
+                      onClick={() => initiateCallToClient(client)}
+                      className="w-full px-3 py-1 bg-green-600 text-white text-xs lg:text-sm rounded hover:bg-green-700 transition-colors"
+                    >
+                      Call Again
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
 
       {/* Call Modal */}
@@ -1354,7 +1279,7 @@ Copy this message and paste it in the chat:
                   onChange={(e) => setMessageData({...messageData, channel: e.target.value})}
                   className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="telegram">Telegram</option>
+                  <option value="email">Email</option>
                 </select>
               </div>
               

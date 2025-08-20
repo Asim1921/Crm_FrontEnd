@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import LoginModal from '../components/LoginModal';
+import Toast from '../components/Toast';
 
 const Login = () => {
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -19,14 +21,31 @@ const Login = () => {
   const handleLogin = async (formData) => {
     try {
       await login(formData.username, formData.password);
-      navigate('/dashboard');
+      setToast({
+        message: 'Login successful! Welcome back.',
+        type: 'success'
+      });
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1000);
     } catch (error) {
       console.error('Login failed:', error);
+      setToast({
+        message: error.message || 'Invalid username or password. Please try again.',
+        type: 'error'
+      });
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
       {/* Background Dashboard (faded) */}
       <div className="opacity-30">
         {/* Header */}

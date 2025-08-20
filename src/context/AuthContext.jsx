@@ -106,10 +106,10 @@ export const AuthProvider = ({ children }) => {
         });
         return { success: true };
       } else {
-        return { success: false, message: data.message };
+        throw new Error(data.message || 'Login failed');
       }
     } catch (error) {
-      return { success: false, message: 'Network error' };
+      throw new Error(error.message || 'Network error');
     }
   };
 

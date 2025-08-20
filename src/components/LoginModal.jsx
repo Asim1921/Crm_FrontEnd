@@ -6,10 +6,16 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
     username: '',
     password: ''
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    onLogin(formData);
+    setIsLoading(true);
+    try {
+      await onLogin(formData);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -44,7 +50,8 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
               placeholder="username"
               value={formData.username}
               onChange={handleChange}
-              className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              disabled={isLoading}
+              className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               required
             />
           </div>
@@ -56,7 +63,8 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
               placeholder="Password"
               value={formData.password}
               onChange={handleChange}
-              className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              disabled={isLoading}
+              className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
               required
             />
           </div>
@@ -64,10 +72,20 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-red-500 text-white font-bold py-2 lg:py-3 px-3 lg:px-4 text-sm lg:text-base rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center space-x-2"
+            disabled={isLoading}
+            className="w-full bg-red-500 text-white font-bold py-2 lg:py-3 px-3 lg:px-4 text-sm lg:text-base rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />
-            <span>Yes, Sign in</span>
+            {isLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 lg:h-5 lg:w-5 border-b-2 border-white"></div>
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />
+                <span>Yes, Sign in</span>
+              </>
+            )}
           </button>
         </form>
 
