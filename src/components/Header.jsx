@@ -166,7 +166,7 @@ const Header = ({ title, onMenuClick, isMobile }) => {
     navigate('/profile');
   };
 
-    return (
+  return (
     <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3 lg:space-x-4">
@@ -189,8 +189,8 @@ const Header = ({ title, onMenuClick, isMobile }) => {
             <div className="flex flex-col">
               <h1 className="text-lg lg:text-xl font-bold text-gray-800">{title}</h1>
               <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">
-                {user?.role === 'admin' ? 'Administrator' : 'Agent'}
-              </span>
+            {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+          </span>
             </div>
           </div>
         </div>

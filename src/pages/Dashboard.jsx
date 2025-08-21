@@ -72,7 +72,7 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // Filter clients based on status and agent assignment
+  // Filter clients based on status, campaign, and agent assignment
   const filteredClients = recentClients.filter(client => {
     // If user is not admin, only show clients assigned to them
     if (user?.role !== 'admin') {
@@ -81,8 +81,11 @@ const Dashboard = () => {
       if (!isAssignedToUser) return false;
     }
     
-    // Apply status filter
+    // Apply status/campaign filter
     if (statusFilter === 'all') return true;
+    if (statusFilter === 'Data' || statusFilter === 'Affiliate') {
+      return client.campaign === statusFilter;
+    }
     return client.status === statusFilter;
   });
 
@@ -96,6 +99,17 @@ const Dashboard = () => {
       console.log('User Email:', user.email);
     }
   }, [user, recentClients, filteredClients]);
+
+  // Debug logging for all users to check campaign data
+  useEffect(() => {
+    console.log('Dashboard Stats:', stats);
+    console.log('Recent Clients with Campaign:', recentClients.map(client => ({
+      name: `${client.firstName} ${client.lastName}`,
+      campaign: client.campaign,
+      status: client.status
+    })));
+    console.log('Status Filter:', statusFilter);
+  }, [stats, recentClients, statusFilter]);
 
   // Handle status card clicks
   const handleStatusCardClick = (status) => {
@@ -462,6 +476,26 @@ const Dashboard = () => {
                     FTD
                   </button>
                   <button 
+                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                      statusFilter === 'Data' 
+                        ? 'bg-indigo-100 text-indigo-600' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setStatusFilter('Data')}
+                  >
+                    Data
+                  </button>
+                  <button 
+                    className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                      statusFilter === 'Affiliate' 
+                        ? 'bg-teal-100 text-teal-600' 
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                    onClick={() => setStatusFilter('Affiliate')}
+                  >
+                    Affiliate
+                  </button>
+                  <button 
                     className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
                     onClick={handleExport}
                   >
@@ -535,74 +569,79 @@ const Dashboard = () => {
                             >
                               <Mail className="w-4 h-4" />
                             </button>
+                                                         {/* Three dots menu - Admin sees all options, agents see only status change */}
                                                          <div className="relative">
-                               <button 
-                                 className="text-gray-600 hover:text-gray-900 transition-colors"
-                                 onClick={(e) => {
-                                   e.stopPropagation();
-                                   setShowMenu(showMenu === client._id ? null : client._id);
-                                 }}
-                                 title="More options"
-                               >
-                                 <MoreHorizontal className="w-4 h-4" />
-                               </button>
-                               {showMenu === client._id && (
-                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
-                                   <div className="py-1">
-                                     <button
-                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         handleMenuAction('view', client);
-                                       }}
-                                     >
-                                       <FileText className="w-4 h-4 mr-2" />
-                                       View Details
-                                     </button>
-                                     <button
-                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         handleMenuAction('edit', client);
-                                       }}
-                                     >
-                                       <Edit className="w-4 h-4 mr-2" />
-                                       Edit Client
-                                     </button>
-                                     <button
-                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         handleMenuAction('change-status', client);
-                                       }}
-                                     >
-                                       <Tag className="w-4 h-4 mr-2" />
-                                       Change Status
-                                     </button>
-                                     <button
-                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         handleMenuAction('assign', client);
-                                       }}
-                                     >
-                                       <Users className="w-4 h-4 mr-2" />
-                                       Assign Agent
-                                     </button>
-                                     <button
-                                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                       onClick={(e) => {
-                                         e.stopPropagation();
-                                         handleMenuAction('delete', client);
-                                       }}
-                                     >
-                                       <Trash2 className="w-4 h-4 mr-2" />
-                                       Delete
-                                     </button>
-                                   </div>
-                                 </div>
-                               )}
-                             </div>
+                                                           <button 
+                                                             className="text-gray-600 hover:text-gray-900 transition-colors"
+                                                             onClick={(e) => {
+                                                               e.stopPropagation();
+                                                               setShowMenu(showMenu === client._id ? null : client._id);
+                                                             }}
+                                                             title="More options"
+                                                           >
+                                                             <MoreHorizontal className="w-4 h-4" />
+                                                           </button>
+                                                           {showMenu === client._id && (
+                                                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+                                                               <div className="py-1">
+                                                                 {user?.role === 'admin' && (
+                                                                   <>
+                                                                     <button
+                                                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                       onClick={(e) => {
+                                                                         e.stopPropagation();
+                                                                         handleMenuAction('view', client);
+                                                                       }}
+                                                                     >
+                                                                       <FileText className="w-4 h-4 mr-2" />
+                                                                       View Details
+                                                                     </button>
+                                                                     <button
+                                                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                       onClick={(e) => {
+                                                                         e.stopPropagation();
+                                                                         handleMenuAction('edit', client);
+                                                                       }}
+                                                                     >
+                                                                       <Edit className="w-4 h-4 mr-2" />
+                                                                       Edit Client
+                                                                     </button>
+                                                                     <button
+                                                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                       onClick={(e) => {
+                                                                         e.stopPropagation();
+                                                                         handleMenuAction('assign', client);
+                                                                       }}
+                                                                     >
+                                                                       <Users className="w-4 h-4 mr-2" />
+                                                                       Assign Agent
+                                                                     </button>
+                                                                     <button
+                                                                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                       onClick={(e) => {
+                                                                         e.stopPropagation();
+                                                                         handleMenuAction('delete', client);
+                                                                       }}
+                                                                     >
+                                                                       <Trash2 className="w-4 h-4 mr-2" />
+                                                                       Delete
+                                                                     </button>
+                                                                   </>
+                                                                 )}
+                                                                 <button
+                                                                   className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                   onClick={(e) => {
+                                                                     e.stopPropagation();
+                                                                     handleMenuAction('change-status', client);
+                                                                   }}
+                                                                 >
+                                                                   <Tag className="w-4 h-4 mr-2" />
+                                                                   Change Status
+                                                                 </button>
+                                                               </div>
+                                                             </div>
+                                                           )}
+                                                         </div>
                           </div>
                         </td>
                       </tr>
@@ -672,6 +711,45 @@ const Dashboard = () => {
                     </span>
                   </div>
                 ))}
+                
+                {/* Campaign Options - Data and Affiliate */}
+                <div 
+                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                    statusFilter === 'Data' 
+                      ? 'bg-indigo-50 border border-indigo-200' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleLeadStatusClick('Data')}
+                >
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full mr-3 bg-indigo-500"></div>
+                    <span className={`text-sm ${statusFilter === 'Data' ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}>
+                      Data
+                    </span>
+                  </div>
+                  <span className={`text-sm font-medium ${statusFilter === 'Data' ? 'text-indigo-700' : 'text-gray-900'}`}>
+                    {recentClients.filter(client => client.campaign === 'Data').length}
+                  </span>
+                </div>
+                
+                <div 
+                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                    statusFilter === 'Affiliate' 
+                      ? 'bg-teal-50 border border-teal-200' 
+                      : 'hover:bg-gray-50'
+                  }`}
+                  onClick={() => handleLeadStatusClick('Affiliate')}
+                >
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 rounded-full mr-3 bg-teal-500"></div>
+                    <span className={`text-sm ${statusFilter === 'Affiliate' ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>
+                      Affiliate
+                    </span>
+                  </div>
+                  <span className={`text-sm font-medium ${statusFilter === 'Affiliate' ? 'text-teal-700' : 'text-gray-900'}`}>
+                    {recentClients.filter(client => client.campaign === 'Affiliate').length}
+                  </span>
+                </div>
               </div>
             </div>
 

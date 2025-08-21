@@ -42,7 +42,8 @@ const Profile = () => {
     bio: user?.bio || '',
     company: user?.company || 'CRM Platform',
     title: user?.title || (user?.role === 'admin' ? 'Administrator' : 'Agent'),
-    location: user?.location || 'Remote'
+    location: user?.location || 'Remote',
+    campaign: user?.campaign || 'Data'
   });
 
   // Update profile data when user data changes
@@ -56,7 +57,8 @@ const Profile = () => {
         bio: user.bio || '',
         company: user.company || 'CRM Platform',
         title: user.title || (user?.role === 'admin' ? 'Administrator' : 'Agent'),
-        location: user.location || 'Remote'
+        location: user.location || 'Remote',
+        campaign: user.campaign || 'Data'
       });
     }
   }, [user]);
@@ -455,6 +457,23 @@ const Profile = () => {
                 className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 resize-none"
               />
             </div>
+
+            {/* Campaign Dropdown - Only visible to admins */}
+            {user?.role === 'admin' && (
+              <div>
+                <label className="block text-xs lg:text-sm font-medium text-gray-700 mb-2">Campaign</label>
+                <select
+                  name="campaign"
+                  value={profileData.campaign}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
+                >
+                  <option value="Data">Data</option>
+                  <option value="Affiliate">Affiliate</option>
+                </select>
+              </div>
+            )}
           </div>
 
           {isEditing && (

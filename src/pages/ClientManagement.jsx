@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clientAPI, reportsAPI } from '../utils/api';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
 import { 
   Search, 
   Filter, 
@@ -22,6 +23,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 const ClientManagement = () => {
   const navigate = useNavigate();
   const { addClientNotification } = useNotifications();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -55,7 +58,8 @@ const ClientManagement = () => {
     email: '',
     phone: '',
     country: '',
-    status: 'New Lead'
+    status: 'New Lead',
+    campaign: 'Data'
   });
   const [importFile, setImportFile] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
@@ -281,7 +285,8 @@ const ClientManagement = () => {
         email: '',
         phone: '',
         country: '',
-        status: 'New Lead'
+        status: 'New Lead',
+        campaign: 'Data'
       });
       window.location.reload();
     } catch (err) {
@@ -357,13 +362,7 @@ const ClientManagement = () => {
     color: ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#FB7185'][index % 6]
   }));
 
-  const barChartData = [
-    { name: 'Mon', value: 120 },
-    { name: 'Tue', value: 180 },
-    { name: 'Wed', value: 200 },
-    { name: 'Thu', value: 150 },
-    { name: 'Fri', value: 100 }
-  ];
+
 
   const leadStatusData = analytics.leadStatusOverview.map((item) => ({
     status: item._id,
@@ -433,71 +432,75 @@ const ClientManagement = () => {
             </select>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-          <button 
-            onClick={() => setShowImportModal(true)}
-            className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-          >
-            <Upload className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Import Excel</span>
-            <span className="sm:hidden">Import</span>
-          </button>
-          <button 
-            onClick={handleExportClients}
-            className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Export Excel</span>
-            <span className="sm:hidden">Export</span>
-          </button>
-          <button 
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            <span className="hidden sm:inline">Add Client</span>
-            <span className="sm:hidden">Add</span>
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+            <button 
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Import Excel</span>
+              <span className="sm:hidden">Import</span>
+            </button>
+            <button 
+              onClick={handleExportClients}
+              className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Export Excel</span>
+              <span className="sm:hidden">Export</span>
+            </button>
+            <button 
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Add Client</span>
+              <span className="sm:hidden">Add</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Assignment Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
-        <div className="flex items-center space-x-2">
-          <input 
-            type="checkbox" 
-            id="selectAll" 
-            checked={selectAll}
-            onChange={(e) => handleSelectAll(e.target.checked)}
-            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
-            Select All
-          </label>
+      {/* Assignment Bar - Only for Admins */}
+      {isAdmin && (
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
+          <div className="flex items-center space-x-2">
+            <input 
+              type="checkbox" 
+              id="selectAll" 
+              checked={selectAll}
+              onChange={(e) => handleSelectAll(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
+              Select All
+            </label>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+            <span className="text-sm text-gray-700 font-medium">Assign to:</span>
+            <select 
+              value={assignToAgent}
+              onChange={(e) => setAssignToAgent(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Select Agent</option>
+              {availableAgents.map((agent) => (
+                <option key={agent._id} value={agent._id}>
+                  {agent.firstName} {agent.lastName}
+                </option>
+              ))}
+            </select>
+            <button 
+              onClick={handleAssignClients}
+              disabled={selectedClients.size === 0 || !assignToAgent}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            >
+              Assign ({selectedClients.size})
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-          <span className="text-sm text-gray-700 font-medium">Assign to:</span>
-          <select 
-            value={assignToAgent}
-            onChange={(e) => setAssignToAgent(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-          >
-            <option value="">Select Agent</option>
-            {availableAgents.map((agent) => (
-              <option key={agent._id} value={agent._id}>
-                {agent.firstName} {agent.lastName}
-              </option>
-            ))}
-          </select>
-          <button 
-            onClick={handleAssignClients}
-            disabled={selectedClients.size === 0 || !assignToAgent}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-          >
-            Assign ({selectedClients.size})
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Main Client Table */}
       <div className="mb-6">
@@ -506,14 +509,16 @@ const ClientManagement = () => {
             <table className="w-full min-w-[800px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 lg:px-6 py-3 text-left">
-                    <input 
-                      type="checkbox" 
-                      checked={selectAll}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                    />
-                  </th>
+                  {isAdmin && (
+                    <th className="px-4 lg:px-6 py-3 text-left">
+                      <input 
+                        type="checkbox" 
+                        checked={selectAll}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
@@ -526,14 +531,16 @@ const ClientManagement = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {clients.map((client) => (
                   <tr key={client._id} className="hover:bg-gray-50">
-                                         <td className="px-4 lg:px-6 py-4">
-                       <input 
-                         type="checkbox" 
-                         checked={selectedClients.has(client._id)}
-                         onChange={(e) => handleClientSelect(client._id, e.target.checked)}
-                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                       />
-                     </td>
+                    {isAdmin && (
+                      <td className="px-4 lg:px-6 py-4">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedClients.has(client._id)}
+                          onChange={(e) => handleClientSelect(client._id, e.target.checked)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </td>
+                    )}
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                        <div className="flex items-center">
                          <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-white text-xs lg:text-sm font-medium ${getAvatarColor(client.firstName + client.lastName)}`}>
@@ -655,47 +662,33 @@ const ClientManagement = () => {
           </div>
         </div>
 
-                 {/* Engagement Metrics */}
+                 {/* Lead Status Overview */}
          <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
-           <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Engagement Metrics</h3>
-           <div className="h-48 lg:h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={barChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="value" fill="#8dd3c7" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
-
-             {/* Lead Status Overview - Below the charts */}
-       <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
-         <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
-        {leadStatusData.map((item, index) => (
-          <div key={item.status} className="flex items-center justify-between mb-4">
-            <div className="flex items-center">
-              <div className={`w-3 h-3 rounded-full mr-3 ${item.color}`}></div>
-              <span className="text-sm text-gray-700">{item.status}</span>
-            </div>
-            <span className="text-sm font-medium text-gray-900">{item.count}</span>
-          </div>
-        ))}
-        {/* Status Progress Bar */}
-        <div className="mt-4">
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-blue-600 h-2 rounded-full" 
-              style={{
-                width: `${analytics.totalClients > 0 ? (leadStatusData[0]?.count || 0) / analytics.totalClients * 100 : 0}%`
-              }}
-            ></div>
-          </div>
-        </div>
-      </div>
+           <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
+           <div className="space-y-3">
+             {leadStatusData.map((item, index) => (
+               <div key={item.status} className="flex items-center justify-between">
+                 <div className="flex items-center">
+                   <div className={`w-3 h-3 rounded-full mr-3 ${item.color}`}></div>
+                   <span className="text-sm text-gray-700">{item.status}</span>
+                 </div>
+                 <span className="text-sm font-medium text-gray-900">{item.count}</span>
+               </div>
+             ))}
+           </div>
+           {/* Status Progress Bar */}
+           <div className="mt-4">
+             <div className="w-full bg-gray-200 rounded-full h-2">
+               <div 
+                 className="bg-blue-600 h-2 rounded-full" 
+                 style={{
+                   width: `${analytics.totalClients > 0 ? (leadStatusData[0]?.count || 0) / analytics.totalClients * 100 : 0}%`
+                 }}
+               ></div>
+             </div>
+           </div>
+         </div>
+       </div>
 
              {/* Add Client Modal */}
        {showAddModal && (
@@ -746,18 +739,13 @@ const ClientManagement = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
-                <select
+                <input
+                  type="text"
                   value={newClient.country}
                   onChange={(e) => setNewClient({...newClient, country: e.target.value})}
+                  placeholder="Enter country name"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Country</option>
-                  {availableCountries.map((country) => (
-                    <option key={country} value={country}>
-                      {country}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -772,6 +760,17 @@ const ClientManagement = () => {
                   <option value="No Answer">No Answer</option>
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
+                <select
+                  value={newClient.campaign}
+                  onChange={(e) => setNewClient({...newClient, campaign: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Data">Data</option>
+                  <option value="Affiliate">Affiliate</option>
                 </select>
               </div>
             </div>

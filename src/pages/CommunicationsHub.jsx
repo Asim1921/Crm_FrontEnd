@@ -615,16 +615,16 @@ Choose "OK" for Anonymous Mode or "Cancel" for Direct Mode.`);
     const clientName = `${client.firstName} ${client.lastName}`;
     const phoneNumber = client.phone.replace(/\D/g, '');
     
-    // Simple and reliable Telegram integration
-    const telegramWebUrl = `https://web.telegram.org/k/`;
-    
-    // Try to copy message to clipboard
-    try {
-      navigator.clipboard.writeText(messageContent).then(() => {
-        // Open Telegram Web directly
-        window.open(telegramWebUrl, '_blank');
+        // Simple and reliable Telegram integration
+        const telegramWebUrl = `https://web.telegram.org/k/`;
         
-        const instructions = `📱 Telegram Web opened! Here's how to send your message:
+        // Try to copy message to clipboard
+        try {
+      navigator.clipboard.writeText(messageContent).then(() => {
+            // Open Telegram Web directly
+            window.open(telegramWebUrl, '_blank');
+            
+            const instructions = `📱 Telegram Web opened! Here's how to send your message:
 
 🔍 **Step 1: Find the Contact**
 - Click the search icon (🔍) in Telegram
@@ -644,16 +644,16 @@ Choose "OK" for Anonymous Mode or "Cancel" for Direct Mode.`);
 - Make sure you're logged into Telegram Web
 
 📱 **Alternative:** Use Telegram Desktop or Mobile app for better contact search`;
-        
-        setTimeout(() => {
-          alert(instructions);
-        }, 2000);
-      });
-    } catch (error) {
-      // Fallback if clipboard API is not available
-      window.open(telegramWebUrl, '_blank');
-      
-      const instructions = `📱 Telegram Web opened! Here's how to send your message:
+            
+            setTimeout(() => {
+              alert(instructions);
+            }, 2000);
+          });
+        } catch (error) {
+          // Fallback if clipboard API is not available
+          window.open(telegramWebUrl, '_blank');
+          
+          const instructions = `📱 Telegram Web opened! Here's how to send your message:
 
 🔍 **Step 1: Find the Contact**
 - Click the search icon (🔍) in Telegram
@@ -675,9 +675,9 @@ Copy this message and paste it in the chat:
 - Make sure you're logged into Telegram Web
 
 📱 **Alternative:** Use Telegram Desktop or Mobile app for better contact search`;
-      
-      setTimeout(() => {
-        alert(instructions);
+          
+          setTimeout(() => {
+            alert(instructions);
       }, 2002);
     }
   };
@@ -888,23 +888,23 @@ Copy this message and paste it in the chat:
                        <span className="text-sm lg:text-base font-medium text-green-800">
                          {currentCall.twilioStatus === 'initiated' ? 'Call Initiated' : 'Active Call'}
                        </span>
-                     </div>
+                </div>
                      <span className="text-xs lg:text-sm text-green-600">
                        {Math.round((new Date() - currentCall.startTime) / 1000)}s
                      </span>
-                   </div>
-                   
+              </div>
+
                    <p className="text-xs lg:text-sm text-green-700 mb-3">Calling: {twilioAPI.formatPhoneNumber(currentCall.number)}</p>
                    
                    {currentCall.callSid && (
                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
-                       <p className="text-sm text-blue-800">
+                  <p className="text-sm text-blue-800">
                          <strong>Call SID:</strong> {currentCall.callSid}
                        </p>
                        <p className="text-xs text-blue-600 mt-1">
                          Status: {currentCall.twilioStatus}
-                       </p>
-                     </div>
+                  </p>
+                </div>
                    )}
                    
                    <div className="flex flex-wrap gap-2">
@@ -947,8 +947,8 @@ Copy this message and paste it in the chat:
                        <X className="w-4 h-4" />
                        <span className="text-xs">Cancel</span>
                      </button>
-                   </div>
-                 </div>
+              </div>
+            </div>
                )}
 
 
@@ -970,11 +970,11 @@ Copy this message and paste it in the chat:
                            ) : (
                              <Clock className="w-4 h-4 text-yellow-500" />
                            )}
-                         </div>
-                       </div>
+              </div>
+            </div>
                      ))}
-                   </div>
-                 </div>
+                  </div>
+                </div>
                )}
 
               <div className="bg-blue-50 rounded-lg p-3 lg:p-4">
@@ -990,26 +990,26 @@ Copy this message and paste it in the chat:
                        'Twilio integration not available. Check configuration.'}
                     </p>
                     {twilioStatus === 'error' && (
-                      <button
+                <button 
                         onClick={() => setShowTwilioGuideModal(true)}
                         className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
-                      >
+                >
                         View Integration Guide →
-                      </button>
+                </button>
                     )}
                     {twilioStatus === 'connected' && (
-                      <button
+                <button 
                         onClick={() => setShowTwilioGuideModal(true)}
                         className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
-                      >
+                >
                         View Account Info →
-                      </button>
+                </button>
                     )}
-                  </div>
-                </div>
+              </div>
               </div>
             </div>
           </div>
+        </div>
 
           {/* Email Integration */}
           <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">

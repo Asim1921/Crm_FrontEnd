@@ -173,6 +173,44 @@ const ClientProfile = () => {
     alert('Meeting scheduling functionality would be implemented here');
   };
 
+  // Handle status change
+  const handleStatusChange = async (newStatus) => {
+    try {
+      // Update the client status via API
+      await clientAPI.updateClient(id, { status: newStatus });
+      
+      // Update local state
+      setClient(prevClient => ({
+        ...prevClient,
+        status: newStatus
+      }));
+      
+      alert('Status updated successfully!');
+    } catch (err) {
+      console.error('Error updating status:', err);
+      alert('Failed to update status: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle campaign change
+  const handleCampaignChange = async (newCampaign) => {
+    try {
+      // Update the client campaign via API
+      await clientAPI.updateClient(id, { campaign: newCampaign });
+      
+      // Update local state
+      setClient(prevClient => ({
+        ...prevClient,
+        campaign: newCampaign
+      }));
+      
+      alert('Campaign updated successfully!');
+    } catch (err) {
+      console.error('Error updating campaign:', err);
+      alert('Failed to update campaign: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
@@ -198,6 +236,18 @@ const ClientProfile = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
+      case 'New Lead':
+        return 'bg-green-100 text-green-800';
+      case 'FTD':
+        return 'bg-blue-100 text-blue-800';
+      case 'Call Again':
+        return 'bg-orange-100 text-orange-800';
+      case 'No Answer':
+        return 'bg-red-100 text-red-800';
+      case 'Not Interested':
+        return 'bg-gray-100 text-gray-800';
+      case 'Hang Up':
+        return 'bg-purple-100 text-purple-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'pending':
@@ -273,6 +323,40 @@ const ClientProfile = () => {
             </div>
 
             <div className="space-y-3">
+              {/* Status Dropdown */}
+              <div className="text-center">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={client.status}
+                  onChange={(e) => handleStatusChange(e.target.value)}
+                  className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium ${getStatusColor(client.status)} w-full max-w-xs`}
+                >
+                  <option value="New Lead">New Lead</option>
+                  <option value="FTD">FTD</option>
+                  <option value="Call Again">Call Again</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="Not Interested">Not Interested</option>
+                  <option value="Hang Up">Hang Up</option>
+                </select>
+              </div>
+
+              {/* Campaign Dropdown */}
+              <div className="text-center">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Campaign</label>
+                <select
+                  value={client.campaign || 'Data'}
+                  onChange={(e) => handleCampaignChange(e.target.value)}
+                  className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium w-full max-w-xs ${
+                    client.campaign === 'Data' ? 'bg-indigo-100 text-indigo-800' : 
+                    client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                    'bg-gray-100 text-gray-800'
+                  }`}
+                >
+                  <option value="Data">Data</option>
+                  <option value="Affiliate">Affiliate</option>
+                </select>
+              </div>
+              
               <div className="flex items-center justify-center space-x-4">
                 <button
                   onClick={handleCall}
@@ -489,9 +573,18 @@ const ClientProfile = () => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(client.status)}`}>
-                        {client.status}
-                      </span>
+                      <select
+                        value={client.status}
+                        onChange={(e) => handleStatusChange(e.target.value)}
+                        className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium ${getStatusColor(client.status)}`}
+                      >
+                        <option value="New Lead">New Lead</option>
+                        <option value="FTD">FTD</option>
+                        <option value="Call Again">Call Again</option>
+                        <option value="No Answer">No Answer</option>
+                        <option value="Not Interested">Not Interested</option>
+                        <option value="Hang Up">Hang Up</option>
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Agent</label>
