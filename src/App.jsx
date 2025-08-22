@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { SearchProvider } from './context/SearchContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -17,24 +18,26 @@ function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <Router>
-          <div className="App">
-            <Routes>
-              <Route path="/login" element={<Login />} />
-              <Route path="/" element={<PrivateRoute />}>
-                <Route index element={<Navigate to="/dashboard" replace />} />
-                <Route path="dashboard" element={<Dashboard />} />
-                <Route path="clients" element={<ClientManagement />} />
-                <Route path="clients/:id" element={<ClientProfile />} />
-                <Route path="tasks" element={<TaskManagement />} />
-                <Route path="communications" element={<CommunicationsHub />} />
-                <Route path="reports" element={<ReportsAnalytics />} />
-                <Route path="settings" element={<Settings />} />
-                <Route path="profile" element={<Profile />} />
-              </Route>
-            </Routes>
-          </div>
-        </Router>
+        <SearchProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<PrivateRoute />}>
+                  <Route index element={<Navigate to="/dashboard" replace />} />
+                  <Route path="dashboard" element={<Dashboard />} />
+                  <Route path="clients" element={<ClientManagement />} />
+                  <Route path="clients/:id" element={<ClientProfile />} />
+                  <Route path="tasks" element={<TaskManagement />} />
+                  <Route path="communications" element={<CommunicationsHub />} />
+                  <Route path="reports" element={<ReportsAnalytics />} />
+                  <Route path="settings" element={<Settings />} />
+                  <Route path="profile" element={<Profile />} />
+                </Route>
+              </Routes>
+            </div>
+          </Router>
+        </SearchProvider>
       </NotificationProvider>
     </AuthProvider>
   );

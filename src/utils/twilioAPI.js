@@ -1,7 +1,7 @@
 // Twilio API Configuration
 const TWILIO_CONFIG = {
   accountSid: 'AC2e749f3b25fc86afa0dd6937206d95ec',
-  authToken: '5300f9adc7ca0d10009e9f1c322cc4d7',
+  authToken: 'fd74dacc077f671da704bf0570b50041',
   phoneNumber: '+14433206038',
   // Note: In production, these should be stored securely on the backend
 };
@@ -28,10 +28,9 @@ class TwilioAPI {
       // Use the original number since it's verified
       let testNumber = toNumber;
       
-      // For now, use demo mode until ngrok is set up
-      // TODO: Replace with your actual ngrok URL
-      const webhookUrl = 'https://demo.twilio.com/docs/voice.xml';
-      const statusCallbackUrl = 'https://demo.twilio.com/docs/voice.xml';
+      // For now, use the simple webhook approach to avoid double calls
+      const webhookUrl = 'https://c03b148fdcfb.ngrok-free.app/twiml/voice';
+      const statusCallbackUrl = 'https://c03b148fdcfb.ngrok-free.app/api/call-status';
       
       const response = await fetch(`${this.baseUrl}/Accounts/${this.accountSid}/Calls.json`, {
         method: 'POST',

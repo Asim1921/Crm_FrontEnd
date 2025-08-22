@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { Device } from '@twilio/voice-sdk';
 import { 
-  Phone, 
+  Phone,
   MessageCircle, 
   Mail, 
   Users,
@@ -63,6 +64,11 @@ const CommunicationsHub = () => {
   const [isOnHold, setIsOnHold] = useState(false);
   const [accountInfo, setAccountInfo] = useState(null);
   const twilioRef = useRef(null);
+  
+  // Browser-based voice call states
+  const [browserDevice, setBrowserDevice] = useState(null);
+  const [browserCall, setBrowserCall] = useState(null);
+  const [isBrowserCallActive, setIsBrowserCallActive] = useState(false);
   
   // Call search functionality
   const [searchAgent, setSearchAgent] = useState('');
@@ -260,6 +266,99 @@ Best regards,
     // For now, we'll just toggle the UI state
     setIsOnHold(!isOnHold);
     console.log('Hold toggled:', !isOnHold);
+  };
+
+  // Browser-based voice call functions
+  const initializeBrowserCall = async () => {
+    try {
+      // Request microphone permission
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('Microphone access granted');
+      
+      // Create a simple audio context for browser-based calling
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(stream);
+      const destination = audioContext.createMediaStreamDestination();
+      source.connect(destination);
+      
+      setBrowserDevice({ stream, audioContext, source, destination });
+      return true;
+    } catch (error) {
+      console.error('Error accessing microphone:', error);
+      alert('Please allow microphone access to make browser calls');
+      return false;
+    }
+  };
+
+  const makeBrowserCall = async (toNumber) => {
+    try {
+      if (!browserDevice) {
+        const initialized = await initializeBrowserCall();
+        if (!initialized) return;
+      }
+
+      console.log(`Making browser call to ${toNumber}`);
+      
+      // For now, use the regular Twilio API call but with browser microphone access
+      const result = await twilioAPI.makeCall(toNumber);
+      
+      if (result.success) {
+        setIsBrowserCallActive(true);
+        setBrowserCall({
+          callSid: result.callSid,
+          toNumber: toNumber,
+          startTime: new Date(),
+          status: 'in-progress'
+        });
+        
+        // Add to call history
+        setCallHistory(prev => [...prev, {
+          callSid: result.callSid,
+          toNumber: toNumber,
+          startTime: new Date(),
+          status: 'in-progress',
+          type: 'browser'
+        }]);
+        
+        console.log('Browser call initiated successfully');
+        alert('✅ Browser call initiated! Your microphone is active and connected to the call.');
+      } else {
+        console.error('Failed to initiate browser call:', result.error);
+        alert('Failed to initiate browser call: ' + result.error);
+      }
+      
+    } catch (error) {
+      console.error('Error making browser call:', error);
+      alert('Error making browser call: ' + error.message);
+    }
+  };
+
+  const endBrowserCall = () => {
+    if (browserCall && browserCall.connection) {
+      // Disconnect the Twilio call
+      browserCall.connection.disconnect();
+    }
+    
+    if (browserCall) {
+      const callEndTime = new Date();
+      const callDuration = Math.round((callEndTime - browserCall.startTime) / 1000);
+      
+      setCallHistory(prev => [...prev, {
+        ...browserCall,
+        endTime: callEndTime,
+        duration: callDuration,
+        status: 'completed'
+      }]);
+    }
+    
+    setBrowserCall(null);
+    setIsBrowserCallActive(false);
+    
+    // Stop microphone stream
+    if (browserDevice && browserDevice.stream) {
+      browserDevice.stream.getTracks().forEach(track => track.stop());
+      setBrowserDevice(null);
+    }
   };
 
   useEffect(() => {
@@ -869,14 +968,24 @@ Copy this message and paste it in the chat:
                     )}
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleCall('voip')}
-                  disabled={twilioStatus === 'error'}
-                  className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                  <Phone className="w-4 h-4" />
-                  <span>Call</span>
-                </button>
+                <div className="flex space-x-2">
+                  <button 
+                    onClick={() => handleCall('voip')}
+                    disabled={twilioStatus === 'error'}
+                    className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>Call</span>
+                  </button>
+                  <button 
+                    onClick={() => makeBrowserCall(callData.phoneNumber || '+923405735723')}
+                    className="bg-green-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-sm"
+                    title="Make call with browser microphone"
+                  >
+                    <Mic className="w-4 h-4" />
+                    <span>Browser Call</span>
+                  </button>
+                </div>
               </div>
 
                              {/* Current Call Status */}

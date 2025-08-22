@@ -119,7 +119,9 @@ const ClientManagement = () => {
           page: currentPage,
           limit: 5, // Changed from 10 to 5
           ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-          ...(statusFilter !== 'all' && { status: statusFilter }),
+          ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
+          ...(statusFilter === 'Data' && { campaign: 'Data' }),
+          ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
           ...(countryFilter !== 'all' && { country: countryFilter }),
           ...(agentFilter !== 'all' && { agent: agentFilter })
         };
@@ -178,6 +180,12 @@ const ClientManagement = () => {
     setCurrentPage(1);
   };
 
+  // Handle lead status overview clicks
+  const handleLeadStatusClick = (status) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+
   // Handle select all checkbox
   const handleSelectAll = (checked) => {
     setSelectAll(checked);
@@ -230,43 +238,93 @@ const ClientManagement = () => {
     }
   };
 
-  // Handle import clients
-  const handleImportClients = async () => {
-    if (!importFile) {
-      alert('Please select a file to import');
-      return;
-    }
+     // Handle import clients
+   const handleImportClients = async () => {
+     if (!importFile) {
+       alert('Please select a file to import');
+       return;
+     }
 
-    setImportLoading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', importFile);
-      
-      // For now, we'll use a simple CSV parser
-      const text = await importFile.text();
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      const clientsData = lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-        const client = {};
-        headers.forEach((header, index) => {
-          client[header] = values[index] || '';
-        });
-        return client;
-      }).filter(client => client.firstName && client.lastName && client.email);
+     setImportLoading(true);
+     try {
+       const text = await importFile.text();
+       const lines = text.split('\n').filter(line => line.trim()); // Remove empty lines
+       
+       if (lines.length < 2) {
+         alert('CSV file must have at least a header row and one data row');
+         return;
+       }
 
-      await clientAPI.importClients(clientsData);
-      alert('Clients imported successfully!');
-      setShowImportModal(false);
-      setImportFile(null);
-      window.location.reload();
-    } catch (err) {
-      console.error('Error importing clients:', err);
-      alert('Failed to import clients: ' + (err.message || 'Unknown error'));
-    } finally {
-      setImportLoading(false);
-    }
-  };
+       // Expected headers in order: name, email, number/phone, country
+       const expectedHeaders = ['name', 'email', 'number', 'country'];
+       const actualHeaders = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase());
+       
+       // Validate headers
+       if (actualHeaders.length !== expectedHeaders.length) {
+         alert(`CSV must have exactly ${expectedHeaders.length} columns in this order: ${expectedHeaders.join(', ')}`);
+         return;
+       }
+       
+       // Check if headers match expected order
+       const isValidOrder = expectedHeaders.every((header, index) => 
+         actualHeaders[index] === header || 
+         (header === 'number' && (actualHeaders[index] === 'phone' || actualHeaders[index] === 'number'))
+       );
+       
+       if (!isValidOrder) {
+         alert(`CSV headers must be in this exact order: ${expectedHeaders.join(', ')}`);
+         return;
+       }
+
+       // Parse data rows
+       const clientsData = lines.slice(1).map((line, index) => {
+         const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+         
+         if (values.length !== expectedHeaders.length) {
+           throw new Error(`Row ${index + 2} has ${values.length} columns, expected ${expectedHeaders.length}`);
+         }
+
+         // Split name into firstName and lastName
+         const fullName = values[0] || '';
+         const nameParts = fullName.trim().split(' ');
+         const firstName = nameParts[0] || '';
+         const lastName = nameParts.slice(1).join(' ') || '';
+
+         return {
+           firstName,
+           lastName,
+           email: values[1] || '',
+           phone: values[2] || '', // number or phone column
+           country: values[3] || '',
+           status: 'New Lead', // Default status
+           campaign: 'Data' // Default campaign
+         };
+       }).filter(client => {
+         // Validate required fields
+         if (!client.firstName || !client.email) {
+           console.warn(`Skipping row: missing firstName or email`);
+           return false;
+         }
+         return true;
+       });
+
+       if (clientsData.length === 0) {
+         alert('No valid client data found. Please check your CSV format.');
+         return;
+       }
+
+       await clientAPI.importClients(clientsData);
+       alert(`Successfully imported ${clientsData.length} clients!`);
+       setShowImportModal(false);
+       setImportFile(null);
+       window.location.reload();
+     } catch (err) {
+       console.error('Error importing clients:', err);
+       alert('Failed to import clients: ' + (err.message || 'Unknown error'));
+     } finally {
+       setImportLoading(false);
+     }
+   };
 
   // Handle add new client
   const handleAddClient = async () => {
@@ -364,16 +422,7 @@ const ClientManagement = () => {
 
 
 
-  const leadStatusData = analytics.leadStatusOverview.map((item) => ({
-    status: item._id,
-    count: item.count,
-    color: item._id === 'New Lead' ? 'bg-green-500' :
-           item._id === 'FTD' ? 'bg-blue-500' :
-           item._id === 'Call Again' ? 'bg-orange-500' :
-           item._id === 'No Answer' ? 'bg-red-500' :
-           item._id === 'Not Interested' ? 'bg-gray-500' :
-           item._id === 'Hang Up' ? 'bg-purple-500' : 'bg-gray-400'
-  }));
+
 
      if (loading) {
      return (
@@ -664,27 +713,99 @@ const ClientManagement = () => {
 
                  {/* Lead Status Overview */}
          <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
-           <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Lead Status Overview</h3>
+           <div className="flex justify-between items-center mb-4">
+             <h3 className="text-base lg:text-lg font-semibold text-gray-900">Lead Status Overview</h3>
+             {statusFilter !== 'all' && (
+               <button
+                 onClick={() => setStatusFilter('all')}
+                 className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+               >
+                 Clear Filter
+               </button>
+             )}
+           </div>
            <div className="space-y-3">
-             {leadStatusData.map((item, index) => (
-               <div key={item.status} className="flex items-center justify-between">
+             {statusFilter !== 'all' && (
+               <div 
+                 className="flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors hover:bg-gray-50"
+                 onClick={() => setStatusFilter('all')}
+               >
                  <div className="flex items-center">
-                   <div className={`w-3 h-3 rounded-full mr-3 ${item.color}`}></div>
-                   <span className="text-sm text-gray-700">{item.status}</span>
+                   <div className="w-3 h-3 rounded-full mr-3 bg-gray-400"></div>
+                   <span className="text-sm text-gray-700">Show All</span>
                  </div>
-                 <span className="text-sm font-medium text-gray-900">{item.count}</span>
+                 <span className="text-sm font-medium text-gray-900">
+                   {analytics.leadStatusOverview.reduce((total, status) => total + status.count, 0)}
+                 </span>
+               </div>
+             )}
+             {analytics.leadStatusOverview && analytics.leadStatusOverview.map((status) => (
+               <div 
+                 key={status._id} 
+                 className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                   statusFilter === status._id 
+                     ? 'bg-blue-50 border border-blue-200' 
+                     : 'hover:bg-gray-50'
+                 }`}
+                 onClick={() => handleLeadStatusClick(status._id)}
+               >
+                 <div className="flex items-center">
+                   <div className={`w-3 h-3 rounded-full mr-3 ${
+                     status._id === 'New Lead' ? 'bg-green-500' :
+                     status._id === 'FTD' ? 'bg-blue-500' :
+                     status._id === 'Call Again' ? 'bg-orange-500' :
+                     status._id === 'No Answer' ? 'bg-red-500' :
+                     status._id === 'Not Interested' ? 'bg-gray-500' :
+                     status._id === 'Hang Up' ? 'bg-purple-500' :
+                     'bg-gray-400'
+                   }`}></div>
+                   <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                     {status._id}
+                   </span>
+                 </div>
+                 <span className={`text-sm font-medium ${statusFilter === status._id ? 'text-blue-700' : 'text-gray-900'}`}>
+                   {status.count}
+                 </span>
                </div>
              ))}
-           </div>
-           {/* Status Progress Bar */}
-           <div className="mt-4">
-             <div className="w-full bg-gray-200 rounded-full h-2">
-               <div 
-                 className="bg-blue-600 h-2 rounded-full" 
-                 style={{
-                   width: `${analytics.totalClients > 0 ? (leadStatusData[0]?.count || 0) / analytics.totalClients * 100 : 0}%`
-                 }}
-               ></div>
+             
+             {/* Campaign Options - Data and Affiliate */}
+             <div 
+               className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                 statusFilter === 'Data' 
+                   ? 'bg-indigo-50 border border-indigo-200' 
+                   : 'hover:bg-gray-50'
+               }`}
+               onClick={() => handleLeadStatusClick('Data')}
+             >
+               <div className="flex items-center">
+                 <div className="w-3 h-3 rounded-full mr-3 bg-indigo-500"></div>
+                 <span className={`text-sm ${statusFilter === 'Data' ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}>
+                   Data
+                 </span>
+               </div>
+               <span className={`text-sm font-medium ${statusFilter === 'Data' ? 'text-indigo-700' : 'text-gray-900'}`}>
+                 {clients.filter(client => client.campaign === 'Data').length}
+               </span>
+             </div>
+             
+             <div 
+               className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                 statusFilter === 'Affiliate' 
+                   ? 'bg-teal-50 border border-teal-200' 
+                   : 'hover:bg-gray-50'
+               }`}
+               onClick={() => handleLeadStatusClick('Affiliate')}
+             >
+               <div className="flex items-center">
+                 <div className="w-3 h-3 rounded-full mr-3 bg-teal-500"></div>
+                 <span className={`text-sm ${statusFilter === 'Affiliate' ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>
+                   Affiliate
+                 </span>
+               </div>
+               <span className={`text-sm font-medium ${statusFilter === 'Affiliate' ? 'text-teal-700' : 'text-gray-900'}`}>
+                 {clients.filter(client => client.campaign === 'Affiliate').length}
+               </span>
              </div>
            </div>
          </div>
@@ -812,9 +933,15 @@ const ClientManagement = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
-              <p className="text-sm text-gray-600">
-                Upload a CSV file with columns: firstName, lastName, email, phone, country, status
-              </p>
+                             <p className="text-sm text-gray-600">
+                 Upload a CSV file with exactly 4 columns in this order: name, email, number/phone, country
+               </p>
+               <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded">
+                 <p className="font-medium mb-1">CSV Format Example:</p>
+                 <p>name,email,number,country</p>
+                 <p>John Doe,john@example.com,+1234567890,United States</p>
+                 <p>Jane Smith,jane@example.com,+0987654321,Canada</p>
+               </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button

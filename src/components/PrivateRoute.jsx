@@ -6,7 +6,7 @@ import Header from './Header';
 import LogoutModal from './LogoutModal';
 
 const PrivateRoute = () => {
-  const { isAuthenticated, loading, logout } = useAuth();
+  const { isAuthenticated, loading, logout, user } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -103,7 +103,7 @@ const PrivateRoute = () => {
         isOpen={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
         onLogout={handleLogout}
-        user={useAuth().user}
+        user={user}
       />
     </div>
   );

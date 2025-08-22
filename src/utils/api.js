@@ -120,6 +120,23 @@ export const clientAPI = {
       method: 'POST',
       body: JSON.stringify({ clients: clientsData })
     });
+  },
+
+  searchClients: async (query) => {
+    return apiRequest(`/clients/search?q=${encodeURIComponent(query)}`);
+  },
+
+  addNote: async (clientId, content) => {
+    return apiRequest(`/clients/${clientId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content })
+    });
+  },
+
+  deleteNote: async (clientId, noteId) => {
+    return apiRequest(`/clients/${clientId}/notes/${noteId}`, {
+      method: 'DELETE'
+    });
   }
 };
 

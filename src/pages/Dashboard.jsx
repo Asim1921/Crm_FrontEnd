@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSearch } from '../context/SearchContext';
 import { useNavigate } from 'react-router-dom';
 import { reportsAPI, clientAPI, communicationAPI } from '../utils/api';
 import { 
@@ -22,11 +23,13 @@ import {
   User,
   Calendar,
   MapPin,
-  Tag
+  Tag,
+  Search
 } from 'lucide-react';
 
 const Dashboard = () => {
   const { user } = useAuth();
+  const { dashboardSearchQuery, updateDashboardSearch } = useSearch();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalClients: { value: 0, change: '0%' },
@@ -72,13 +75,27 @@ const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  // Filter clients based on status, campaign, and agent assignment
+  // Filter clients based on status, campaign, agent assignment, and search query
   const filteredClients = recentClients.filter(client => {
     // If user is not admin, only show clients assigned to them
     if (user?.role !== 'admin') {
       const isAssignedToUser = client.assignedAgent?._id === user?._id || 
                               client.assignedAgent?.email === user?.email;
       if (!isAssignedToUser) return false;
+    }
+    
+    // Apply search filter
+    if (dashboardSearchQuery.trim()) {
+      const query = dashboardSearchQuery.toLowerCase();
+      const matchesSearch = 
+        client.firstName?.toLowerCase().includes(query) ||
+        client.lastName?.toLowerCase().includes(query) ||
+        client.phone?.toLowerCase().includes(query) ||
+        client.email?.toLowerCase().includes(query) ||
+        client.country?.toLowerCase().includes(query) ||
+        client.status?.toLowerCase().includes(query);
+      
+      if (!matchesSearch) return false;
     }
     
     // Apply status/campaign filter
@@ -177,6 +194,8 @@ const Dashboard = () => {
       alert('Export failed: ' + error.message);
     }
   };
+
+
 
   // Handle three dots menu actions
   const handleMenuAction = async (action, client) => {
@@ -365,9 +384,11 @@ const Dashboard = () => {
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600">Total Clients</p>
                 <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.totalClients.value}</p>
-                <p className={`text-xs ${stats.totalClients.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {stats.totalClients.change} from last month
-                </p>
+                {user?.role === 'admin' && (
+                  <p className={`text-xs ${stats.totalClients.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {stats.totalClients.change} from last month
+                  </p>
+                )}
               </div>
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <Users className="w-5 h-5 lg:w-6 lg:h-6 text-blue-600" />
@@ -385,7 +406,9 @@ const Dashboard = () => {
                 <p className="text-xl lg:text-2xl font-bold text-gray-900">
                   {stats.leadStatusOverview?.find(s => s._id === 'New Lead')?.count || 0}
                 </p>
-                <p className="text-xs text-green-600">Active leads</p>
+                {user?.role === 'admin' && (
+                  <p className="text-xs text-green-600">Active leads</p>
+                )}
               </div>
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <Plus className="w-5 h-5 lg:w-6 lg:h-6 text-green-600" />
@@ -401,9 +424,11 @@ const Dashboard = () => {
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600">FTD</p>
                 <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.ftdThisMonth.value}</p>
-                <p className={`text-xs ${stats.ftdThisMonth.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {stats.ftdThisMonth.change} conversion
-                </p>
+                {user?.role === 'admin' && (
+                  <p className={`text-xs ${stats.ftdThisMonth.changeValue >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {stats.ftdThisMonth.change} conversion
+                  </p>
+                )}
               </div>
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
@@ -416,7 +441,9 @@ const Dashboard = () => {
               <div>
                 <p className="text-xs lg:text-sm font-medium text-gray-600">Pending Tasks</p>
                 <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.pendingTasks.value}</p>
-                <p className="text-xs text-gray-600">{stats.pendingTasks.overdue} overdue</p>
+                {user?.role === 'admin' && (
+                  <p className="text-xs text-gray-600">{stats.pendingTasks.overdue} overdue</p>
+                )}
               </div>
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-lg flex items-center justify-center">
                 <ClipboardList className="w-5 h-5 lg:w-6 lg:h-6 text-orange-600" />
@@ -445,6 +472,17 @@ const Dashboard = () => {
                   )}
                 </div>
                 <div className="flex items-center space-x-2">
+                  {/* Search input */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                         <input
+                       type="text"
+                       placeholder="Search clients..."
+                       value={dashboardSearchQuery}
+                       onChange={(e) => updateDashboardSearch(e.target.value)}
+                       className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-48 lg:w-64"
+                     />
+                  </div>
                   <button 
                     className={`px-3 py-1 text-sm rounded-lg transition-colors ${
                       statusFilter === 'all' 
@@ -495,13 +533,15 @@ const Dashboard = () => {
                   >
                     Affiliate
                   </button>
-                  <button 
-                    className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
-                    onClick={handleExport}
-                  >
-                    <TrendingUp className="w-4 h-4 mr-1" />
-                    Export
-                  </button>
+                  {user?.role === 'admin' && (
+                    <button 
+                      className="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg flex items-center"
+                      onClick={handleExport}
+                    >
+                      <TrendingUp className="w-4 h-4 mr-1" />
+                      Export
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -569,79 +609,77 @@ const Dashboard = () => {
                             >
                               <Mail className="w-4 h-4" />
                             </button>
-                                                         {/* Three dots menu - Admin sees all options, agents see only status change */}
-                                                         <div className="relative">
-                                                           <button 
-                                                             className="text-gray-600 hover:text-gray-900 transition-colors"
-                                                             onClick={(e) => {
-                                                               e.stopPropagation();
-                                                               setShowMenu(showMenu === client._id ? null : client._id);
-                                                             }}
-                                                             title="More options"
-                                                           >
-                                                             <MoreHorizontal className="w-4 h-4" />
-                                                           </button>
-                                                           {showMenu === client._id && (
-                                                             <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
-                                                               <div className="py-1">
-                                                                 {user?.role === 'admin' && (
-                                                                   <>
-                                                                     <button
-                                                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                                       onClick={(e) => {
-                                                                         e.stopPropagation();
-                                                                         handleMenuAction('view', client);
-                                                                       }}
-                                                                     >
-                                                                       <FileText className="w-4 h-4 mr-2" />
-                                                                       View Details
-                                                                     </button>
-                                                                     <button
-                                                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                                       onClick={(e) => {
-                                                                         e.stopPropagation();
-                                                                         handleMenuAction('edit', client);
-                                                                       }}
-                                                                     >
-                                                                       <Edit className="w-4 h-4 mr-2" />
-                                                                       Edit Client
-                                                                     </button>
-                                                                     <button
-                                                                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                                       onClick={(e) => {
-                                                                         e.stopPropagation();
-                                                                         handleMenuAction('assign', client);
-                                                                       }}
-                                                                     >
-                                                                       <Users className="w-4 h-4 mr-2" />
-                                                                       Assign Agent
-                                                                     </button>
-                                                                     <button
-                                                                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                                                                       onClick={(e) => {
-                                                                         e.stopPropagation();
-                                                                         handleMenuAction('delete', client);
-                                                                       }}
-                                                                     >
-                                                                       <Trash2 className="w-4 h-4 mr-2" />
-                                                                       Delete
-                                                                     </button>
-                                                                   </>
-                                                                 )}
-                                                                 <button
-                                                                   className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                                                   onClick={(e) => {
-                                                                     e.stopPropagation();
-                                                                     handleMenuAction('change-status', client);
-                                                                   }}
-                                                                 >
-                                                                   <Tag className="w-4 h-4 mr-2" />
-                                                                   Change Status
-                                                                 </button>
+                                                         {/* Three dots menu - Only visible for administrators */}
+                                                         {user?.role === 'admin' && (
+                                                           <div className="relative">
+                                                             <button 
+                                                               className="text-gray-600 hover:text-gray-900 transition-colors"
+                                                               onClick={(e) => {
+                                                                 e.stopPropagation();
+                                                                 setShowMenu(showMenu === client._id ? null : client._id);
+                                                               }}
+                                                               title="More options"
+                                                             >
+                                                               <MoreHorizontal className="w-4 h-4" />
+                                                             </button>
+                                                             {showMenu === client._id && (
+                                                               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-50 border border-gray-200">
+                                                                 <div className="py-1">
+                                                                   <button
+                                                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                     onClick={(e) => {
+                                                                       e.stopPropagation();
+                                                                       handleMenuAction('view', client);
+                                                                     }}
+                                                                   >
+                                                                     <FileText className="w-4 h-4 mr-2" />
+                                                                     View Details
+                                                                   </button>
+                                                                   <button
+                                                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                     onClick={(e) => {
+                                                                       e.stopPropagation();
+                                                                       handleMenuAction('edit', client);
+                                                                     }}
+                                                                   >
+                                                                     <Edit className="w-4 h-4 mr-2" />
+                                                                     Edit Client
+                                                                   </button>
+                                                                   <button
+                                                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                     onClick={(e) => {
+                                                                       e.stopPropagation();
+                                                                       handleMenuAction('assign', client);
+                                                                     }}
+                                                                   >
+                                                                     <Users className="w-4 h-4 mr-2" />
+                                                                     Assign Agent
+                                                                   </button>
+                                                                   <button
+                                                                     className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                                                                     onClick={(e) => {
+                                                                       e.stopPropagation();
+                                                                       handleMenuAction('change-status', client);
+                                                                     }}
+                                                                   >
+                                                                     <Tag className="w-4 h-4 mr-2" />
+                                                                     Change Status
+                                                                   </button>
+                                                                   <button
+                                                                     className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                                                     onClick={(e) => {
+                                                                       e.stopPropagation();
+                                                                       handleMenuAction('delete', client);
+                                                                     }}
+                                                                   >
+                                                                     <Trash2 className="w-4 h-4 mr-2" />
+                                                                     Delete
+                                                                   </button>
+                                                                 </div>
                                                                </div>
-                                                             </div>
-                                                           )}
-                                                         </div>
+                                                             )}
+                                                           </div>
+                                                         )}
                           </div>
                         </td>
                       </tr>

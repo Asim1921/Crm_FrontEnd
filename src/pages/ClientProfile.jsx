@@ -48,7 +48,7 @@ const ClientProfile = () => {
         const clientData = await clientAPI.getClientById(id);
         setClient(clientData);
         
-        // Fetch client's tasks
+        // Fetch all tasks for this client (not just user's tasks)
         const tasksData = await taskAPI.getTasks({ clientId: id });
         setTasks(tasksData.tasks || []);
         
@@ -112,16 +112,9 @@ const ClientProfile = () => {
     }
 
     try {
-      // This would typically call an API to add the note
-      const noteData = {
-        content: newNote,
-        createdBy: user._id,
-        createdAt: new Date()
-      };
-      
-      // For now, we'll simulate adding the note
-      const updatedNotes = [...notes, noteData];
-      setNotes(updatedNotes);
+      const updatedClient = await clientAPI.addNote(id, newNote);
+      setClient(updatedClient);
+      setNotes(updatedClient.notes || []);
       setNewNote('');
       setShowAddNoteModal(false);
       
@@ -146,13 +139,7 @@ const ClientProfile = () => {
         status: 'pending'
       };
       
-      // This would typically call an API to create the task
-      const createdTask = {
-        ...taskData,
-        _id: Date.now().toString(), // Temporary ID
-        createdAt: new Date()
-      };
-      
+      const createdTask = await taskAPI.createTask(taskData);
       setTasks([...tasks, createdTask]);
       setNewTask({
         title: '',
@@ -208,6 +195,25 @@ const ClientProfile = () => {
     } catch (err) {
       console.error('Error updating campaign:', err);
       alert('Failed to update campaign: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle task status update
+  const handleTaskStatusUpdate = async (taskId, newStatus) => {
+    try {
+      await taskAPI.updateTask(taskId, { status: newStatus });
+      
+      // Update local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task._id === taskId ? { ...task, status: newStatus } : task
+        )
+      );
+      
+      alert('Task status updated successfully!');
+    } catch (err) {
+      console.error('Error updating task status:', err);
+      alert('Failed to update task status: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -488,9 +494,31 @@ const ClientProfile = () => {
                               </div>
                               <div className="flex-1">
                                 <p className="text-gray-800">{note.content}</p>
-                                <p className="text-sm text-gray-500 mt-1">
-                                  {formatDate(note.createdAt)}
-                                </p>
+                                <div className="flex items-center justify-between mt-1">
+                                  <p className="text-sm text-gray-500">
+                                    {note.createdBy ? `${note.createdBy.firstName} ${note.createdBy.lastName}` : 'Unknown'} • {formatDate(note.createdAt)}
+                                  </p>
+                                  {(user?.role === 'admin' || (note.createdBy && note.createdBy._id === user?._id)) && (
+                                    <button
+                                      onClick={async () => {
+                                        if (confirm('Are you sure you want to delete this note?')) {
+                                          try {
+                                            await clientAPI.deleteNote(id, note._id);
+                                            const updatedClient = await clientAPI.getClientById(id);
+                                            setClient(updatedClient);
+                                            setNotes(updatedClient.notes || []);
+                                            alert('Note deleted successfully!');
+                                          } catch (err) {
+                                            alert('Failed to delete note: ' + err.message);
+                                          }
+                                        }
+                                      }}
+                                      className="text-red-500 hover:text-red-700 text-sm"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -523,18 +551,26 @@ const ClientProfile = () => {
                                 <input
                                   type="checkbox"
                                   checked={task.status === 'completed'}
-                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                                  readOnly
+                                  onChange={() => handleTaskStatusUpdate(task._id, task.status === 'completed' ? 'pending' : 'completed')}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                                 />
-                                <div>
+                                <div className="flex-1">
                                   <p className="font-medium text-gray-900">{task.title}</p>
-                                  <div className="flex items-center space-x-2 mt-1">
+                                  {task.description && (
+                                    <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+                                  )}
+                                  <div className="flex items-center space-x-2 mt-2">
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(task.priority)}`}>
                                       {task.priority}
                                     </span>
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(task.status)}`}>
                                       {task.status === 'completed' ? 'Completed' : task.dueDate ? `Due: ${formatDate(task.dueDate)}` : 'Pending'}
                                     </span>
+                                    {task.assignedTo && (
+                                      <span className="text-xs text-gray-500">
+                                        • {task.assignedTo.firstName} {task.assignedTo.lastName}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>

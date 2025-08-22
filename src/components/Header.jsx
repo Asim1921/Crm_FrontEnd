@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useSearch } from '../context/SearchContext';
 import { useNavigate } from 'react-router-dom';
+import { clientAPI } from '../utils/api';
 import { 
   Search, 
   Bell, 
@@ -35,9 +37,20 @@ const Header = ({ title, onMenuClick, isMobile }) => {
     deleteNotification, 
     clearAllNotifications 
   } = useNotifications();
+  const { 
+    headerSearchQuery, 
+    headerSearchResults, 
+    isHeaderSearching, 
+    updateHeaderSearch, 
+    clearHeaderSearch, 
+    setHeaderResults, 
+    setHeaderSearching 
+  } = useSearch();
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const notificationRef = useRef(null);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     // Close notifications when clicking outside
@@ -166,6 +179,47 @@ const Header = ({ title, onMenuClick, isMobile }) => {
     navigate('/profile');
   };
 
+  // Search functionality
+  const handleSearch = async (query) => {
+    updateHeaderSearch(query);
+    
+    if (query.trim().length >= 2) {
+      setHeaderSearching(true);
+      try {
+        const response = await clientAPI.searchClients(query);
+        setHeaderResults(response);
+        setShowSearchDropdown(true);
+      } catch (error) {
+        console.error('Error searching clients:', error);
+        setHeaderResults([]);
+      } finally {
+        setHeaderSearching(false);
+      }
+    } else {
+      setHeaderResults([]);
+      setShowSearchDropdown(false);
+    }
+  };
+
+  const handleClientClick = (client) => {
+    clearHeaderSearch();
+    setShowSearchDropdown(false);
+    navigate(`/clients/${client._id}`);
+  };
+
+  const handleSearchFocus = () => {
+    if (headerSearchQuery.trim().length >= 2 && headerSearchResults.length > 0) {
+      setShowSearchDropdown(true);
+    }
+  };
+
+  const handleSearchBlur = () => {
+    // Delay hiding dropdown to allow for clicks
+    setTimeout(() => {
+      setShowSearchDropdown(false);
+    }, 200);
+  };
+
   return (
     <div className="bg-white border-b border-gray-200 px-4 lg:px-6 py-4">
       <div className="flex items-center justify-between">
@@ -196,14 +250,73 @@ const Header = ({ title, onMenuClick, isMobile }) => {
         </div>
         
         <div className="flex items-center space-x-2 lg:space-x-4">
-          {/* Search bar - hidden on mobile */}
-          <div className="relative hidden lg:block">
+          {/* Search bar - visible on all screens */}
+          <div className="relative" ref={searchRef}>
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search clients..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
-            />
+                          <input
+                type="text"
+                placeholder="Search clients..."
+                value={headerSearchQuery}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-48 lg:w-64"
+                onChange={(e) => handleSearch(e.target.value)}
+                onFocus={handleSearchFocus}
+                onBlur={handleSearchBlur}
+              />
+            
+            {/* Search Dropdown */}
+            {showSearchDropdown && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-96 overflow-y-auto">
+                {isHeaderSearching ? (
+                  <div className="p-4 text-center text-gray-500">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-2 text-sm">Searching...</p>
+                  </div>
+                ) : headerSearchResults.length > 0 ? (
+                  <div className="py-2">
+                    {headerSearchResults.map((client) => (
+                      <div
+                        key={client._id}
+                        onClick={() => handleClientClick(client)}
+                        className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                          <span className="text-sm font-medium text-blue-600">
+                            {client.firstName?.charAt(0)}{client.lastName?.charAt(0)}
+                          </span>
+                        </div>
+                        <div className="ml-3 flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">
+                            {client.firstName} {client.lastName}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">
+                            {client.email}
+                          </p>
+                          <div className="flex items-center mt-1">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              client.status === 'New Lead' ? 'bg-green-100 text-green-800' :
+                              client.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
+                              client.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                              {client.status}
+                            </span>
+                            {client.country && (
+                              <span className="ml-2 text-xs text-gray-500">
+                                • {client.country}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : headerSearchQuery.trim().length >= 2 ? (
+                  <div className="p-4 text-center text-gray-500">
+                    <p className="text-sm">No clients found</p>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center space-x-2 lg:space-x-3">
