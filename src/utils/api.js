@@ -228,6 +228,19 @@ export const userAPI = {
 
   getUsers: async () => {
     return apiRequest('/users');
+  },
+
+  updateUser: async (userId, userData) => {
+    return apiRequest(`/users/${userId}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  deleteUser: async (userId) => {
+    return apiRequest(`/users/${userId}`, {
+      method: 'DELETE'
+    });
   }
 };
 

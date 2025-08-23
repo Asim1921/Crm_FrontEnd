@@ -1264,7 +1264,9 @@ Copy this message and paste it in the chat:
                       </span>
                     </div>
                     <div className="text-xs lg:text-sm text-gray-600 mb-2">
-                      <div>📞 {client.phoneNumber}</div>
+                      {user?.role === 'admin' && (
+                        <div>📞 {client.phoneNumber}</div>
+                      )}
                       <div>📅 Last call: {client.lastCallDate.toLocaleDateString()}</div>
                     </div>
                     <button
@@ -1304,7 +1306,7 @@ Copy this message and paste it in the chat:
                   <option value="">Choose a client...</option>
                   {clients.map(client => (
                     <option key={client._id} value={client._id}>
-                      {client.firstName} {client.lastName} - {client.phone}
+                      {client.firstName} {client.lastName}{user?.role === 'admin' ? ` - ${client.phone}` : ''}
                     </option>
                   ))}
                 </select>
@@ -1375,7 +1377,7 @@ Copy this message and paste it in the chat:
                   <option value="">Choose a client...</option>
                   {clients.map(client => (
                     <option key={client._id} value={client._id}>
-                      {client.firstName} {client.lastName} - {client.phone}
+                      {client.firstName} {client.lastName}{user?.role === 'admin' ? ` - ${client.phone}` : ''}
                     </option>
                   ))}
                 </select>
@@ -1445,7 +1447,7 @@ Copy this message and paste it in the chat:
                   <option value="">Choose a client...</option>
                   {clients.map(client => (
                     <option key={client._id} value={client._id}>
-                      {client.firstName} {client.lastName} - {client.email}
+                      {client.firstName} {client.lastName}{user?.role === 'admin' ? ` - ${client.email}` : ''}
                     </option>
                   ))}
                 </select>

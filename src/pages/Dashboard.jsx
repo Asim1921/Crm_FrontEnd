@@ -477,7 +477,7 @@ const Dashboard = () => {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                                          <input
                        type="text"
-                       placeholder="Search clients..."
+                       placeholder="Search by name, ID, or email..."
                        value={dashboardSearchQuery}
                        onChange={(e) => updateDashboardSearch(e.target.value)}
                        className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-48 lg:w-64"
@@ -549,6 +549,7 @@ const Dashboard = () => {
               <table className="w-full min-w-[600px]">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CONTACT</th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
@@ -559,7 +560,7 @@ const Dashboard = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                                      {filteredClients.length === 0 ? (
                      <tr>
-                       <td colSpan="5" className="px-4 lg:px-6 py-4 text-center text-gray-500">
+                       <td colSpan="6" className="px-4 lg:px-6 py-4 text-center text-gray-500">
                          {user?.role === 'agent' ? (
                            <div className="space-y-2">
                              <p>No clients assigned to you yet.</p>
@@ -575,10 +576,13 @@ const Dashboard = () => {
                    ) : (
                     filteredClients.map((client) => (
                       <tr key={client._id}>
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">{client.clientId}</td>
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{client.country}</td>
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{client.firstName} {client.lastName}</div>
-                          <div className="text-sm text-gray-500">{client.phone}</div>
+                          {user?.role === 'admin' && (
+                            <div className="text-sm text-gray-500">{client.phone}</div>
+                          )}
                         </td>
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -861,14 +865,18 @@ const Dashboard = () => {
                   <label className="block text-sm font-medium text-gray-700">Name</label>
                   <p className="mt-1 text-sm text-gray-900">{selectedClient.firstName} {selectedClient.lastName}</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedClient.email}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
-                  <p className="mt-1 text-sm text-gray-900">{selectedClient.phone}</p>
-                </div>
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Email</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedClient.email}</p>
+                  </div>
+                )}
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Phone</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedClient.phone}</p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Country</label>
                   <p className="mt-1 text-sm text-gray-900">{selectedClient.country}</p>
@@ -962,24 +970,28 @@ const Dashboard = () => {
                   className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <input
-                  type="email"
-                  value={editForm.email || ''}
-                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Phone</label>
-                <input
-                  type="text"
-                  value={editForm.phone || ''}
-                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                  className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-                />
-              </div>
+              {user?.role === 'admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email || ''}
+                    onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
+              {user?.role === 'admin' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <input
+                    type="text"
+                    value={editForm.phone || ''}
+                    onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700">Country</label>
                 <input

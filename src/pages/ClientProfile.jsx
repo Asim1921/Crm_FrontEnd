@@ -217,6 +217,21 @@ const ClientProfile = () => {
     }
   };
 
+  // Handle task deletion
+  const handleTaskDelete = async (taskId) => {
+    try {
+      await taskAPI.deleteTask(taskId);
+      
+      // Update local state
+      setTasks(prevTasks => prevTasks.filter(task => task._id !== taskId));
+      
+      alert('Task deleted successfully!');
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      alert('Failed to delete task: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
@@ -326,6 +341,7 @@ const ClientProfile = () => {
                 {client.firstName} {client.lastName}
               </h4>
               <p className="text-gray-600">({client.role || 'Client'})</p>
+              <p className="text-sm text-gray-500 font-mono">ID: {client.clientId}</p>
             </div>
 
             <div className="space-y-3">
@@ -493,31 +509,36 @@ const ClientProfile = () => {
                                 <User className="w-4 h-4 text-white" />
                               </div>
                               <div className="flex-1">
-                                <p className="text-gray-800">{note.content}</p>
+                                <div className="flex items-start space-x-2">
+                                  <p className="text-gray-800">{note.content}</p>
+                                  {user?.role !== 'admin' && (
+                                    <span className="text-xs text-gray-400 italic">(Read-only)</span>
+                                  )}
+                                </div>
                                 <div className="flex items-center justify-between mt-1">
                                   <p className="text-sm text-gray-500">
                                     {note.createdBy ? `${note.createdBy.firstName} ${note.createdBy.lastName}` : 'Unknown'} • {formatDate(note.createdAt)}
                                   </p>
-                                  {(user?.role === 'admin' || (note.createdBy && note.createdBy._id === user?._id)) && (
-                                    <button
-                                      onClick={async () => {
-                                        if (confirm('Are you sure you want to delete this note?')) {
-                                          try {
-                                            await clientAPI.deleteNote(id, note._id);
-                                            const updatedClient = await clientAPI.getClientById(id);
-                                            setClient(updatedClient);
-                                            setNotes(updatedClient.notes || []);
-                                            alert('Note deleted successfully!');
-                                          } catch (err) {
-                                            alert('Failed to delete note: ' + err.message);
-                                          }
-                                        }
-                                      }}
-                                      className="text-red-500 hover:text-red-700 text-sm"
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
+                                                                     {user?.role === 'admin' && (
+                                     <button
+                                       onClick={async () => {
+                                         if (confirm('Are you sure you want to delete this note?')) {
+                                           try {
+                                             await clientAPI.deleteNote(id, note._id);
+                                             const updatedClient = await clientAPI.getClientById(id);
+                                             setClient(updatedClient);
+                                             setNotes(updatedClient.notes || []);
+                                             alert('Note deleted successfully!');
+                                           } catch (err) {
+                                             alert('Failed to delete note: ' + err.message);
+                                           }
+                                         }
+                                       }}
+                                       className="text-red-500 hover:text-red-700 text-sm"
+                                     >
+                                       Delete
+                                     </button>
+                                   )}
                                 </div>
                               </div>
                             </div>
@@ -552,10 +573,16 @@ const ClientProfile = () => {
                                   type="checkbox"
                                   checked={task.status === 'completed'}
                                   onChange={() => handleTaskStatusUpdate(task._id, task.status === 'completed' ? 'pending' : 'completed')}
-                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
+                                  className={`w-4 h-4 text-blue-600 rounded focus:ring-blue-500 ${user?.role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+                                  disabled={user?.role !== 'admin'}
                                 />
                                 <div className="flex-1">
-                                  <p className="font-medium text-gray-900">{task.title}</p>
+                                  <div className="flex items-center space-x-2">
+                                    <p className="font-medium text-gray-900">{task.title}</p>
+                                    {user?.role !== 'admin' && (
+                                      <span className="text-xs text-gray-400 italic">(Read-only)</span>
+                                    )}
+                                  </div>
                                   {task.description && (
                                     <p className="text-sm text-gray-600 mt-1">{task.description}</p>
                                   )}
@@ -574,6 +601,19 @@ const ClientProfile = () => {
                                   </div>
                                 </div>
                               </div>
+                              {user?.role === 'admin' && (
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to delete this task?')) {
+                                      handleTaskDelete(task._id);
+                                    }
+                                  }}
+                                  className="text-red-500 hover:text-red-700 text-sm ml-2"
+                                  title="Delete Task"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))
@@ -588,6 +628,10 @@ const ClientProfile = () => {
                   <h4 className="text-lg font-semibold text-gray-900 mb-4">Client Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Client ID</label>
+                      <p className="text-gray-900 font-mono">{client.clientId}</p>
+                    </div>
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
                       <p className="text-gray-900">{client.firstName}</p>
                     </div>
@@ -595,14 +639,18 @@ const ClientProfile = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                       <p className="text-gray-900">{client.lastName}</p>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <p className="text-gray-900">{client.email || 'Not provided'}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <p className="text-gray-900">{client.phone || 'Not provided'}</p>
-                    </div>
+                    {user?.role === 'admin' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <p className="text-gray-900">{client.email || 'Not provided'}</p>
+                      </div>
+                    )}
+                    {user?.role === 'admin' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                        <p className="text-gray-900">{client.phone || 'Not provided'}</p>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                       <p className="text-gray-900">{client.country}</p>

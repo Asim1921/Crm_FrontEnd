@@ -21,3 +21,7 @@ export const canExportData = (user) => {
 export const canViewPhoneNumbers = (user) => {
   return isAdmin(user);
 };
+
+export const canViewEmailAddresses = (user) => {
+  return isAdmin(user);
+};

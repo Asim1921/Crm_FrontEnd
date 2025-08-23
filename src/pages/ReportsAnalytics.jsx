@@ -360,6 +360,9 @@ const ReportsAnalytics = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     CLIENT
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -379,7 +382,7 @@ const ReportsAnalytics = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {realClients.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center">
+                    <td colSpan="6" className="px-6 py-12 text-center">
                       <div className="text-gray-500">
                         <div className="text-lg font-medium mb-2">No clients found</div>
                         <div className="text-sm">No recent clients to display.</div>
@@ -389,6 +392,7 @@ const ReportsAnalytics = () => {
                 ) : (
                   realClients.map((client, index) => (
                     <tr key={client._id || index}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">{client.clientId}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${getAvatarColor(client.firstName)}`}>
@@ -398,7 +402,9 @@ const ReportsAnalytics = () => {
                             <div className="text-sm font-medium text-gray-900">
                               {client.firstName} {client.lastName}
                             </div>
-                            <div className="text-sm text-gray-500">{client.email}</div>
+                            {user?.role === 'admin' && (
+                              <div className="text-sm text-gray-500">{client.email}</div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -460,15 +466,19 @@ const ReportsAnalytics = () => {
                   <h4 className="text-lg font-semibold text-gray-900">
                     {selectedClient.firstName} {selectedClient.lastName}
                   </h4>
-                  <p className="text-sm text-gray-600">{selectedClient.email}</p>
+                  {user?.role === 'admin' && (
+                    <p className="text-sm text-gray-600">{selectedClient.email}</p>
+                  )}
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedClient.phone || 'N/A'}</p>
-                </div>
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedClient.phone || 'N/A'}</p>
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
@@ -546,28 +556,32 @@ const ReportsAnalytics = () => {
                 </div>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={editClient.email}
-                  onChange={(e) => setEditClient({...editClient, email: e.target.value})}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter email address"
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
+              {user?.role === 'admin' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
-                    type="text"
-                    value={editClient.phone}
-                    onChange={(e) => setEditClient({...editClient, phone: e.target.value})}
+                    type="email"
+                    value={editClient.email}
+                    onChange={(e) => setEditClient({...editClient, email: e.target.value})}
                     className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter phone number"
+                    placeholder="Enter email address"
                   />
                 </div>
+              )}
+              
+              <div className="grid grid-cols-2 gap-4">
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input
+                      type="text"
+                      value={editClient.phone}
+                      onChange={(e) => setEditClient({...editClient, phone: e.target.value})}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>

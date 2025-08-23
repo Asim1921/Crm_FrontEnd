@@ -255,7 +255,7 @@ const Header = ({ title, onMenuClick, isMobile }) => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <input
                 type="text"
-                placeholder="Search clients..."
+                placeholder="Search by name, ID, or email..."
                 value={headerSearchQuery}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-48 lg:w-64"
                 onChange={(e) => handleSearch(e.target.value)}
@@ -288,9 +288,14 @@ const Header = ({ title, onMenuClick, isMobile }) => {
                           <p className="text-sm font-medium text-gray-900 truncate">
                             {client.firstName} {client.lastName}
                           </p>
-                          <p className="text-sm text-gray-500 truncate">
-                            {client.email}
+                          <p className="text-xs text-gray-400 truncate">
+                            ID: {client.clientId}
                           </p>
+                          {user?.role === 'admin' && (
+                            <p className="text-sm text-gray-500 truncate">
+                              {client.email}
+                            </p>
+                          )}
                           <div className="flex items-center mt-1">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               client.status === 'New Lead' ? 'bg-green-100 text-green-800' :

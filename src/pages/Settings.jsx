@@ -14,7 +14,9 @@ import {
   EyeOff,
   Plus,
   X,
-  UserPlus
+  UserPlus,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { reportsAPI, userAPI } from '../utils/api';
 
@@ -36,6 +38,9 @@ const Settings = () => {
 
   // User management states (Admin only)
   const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+  const [showEditUserModal, setShowEditUserModal] = useState(false);
+  const [showDeleteUserModal, setShowDeleteUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [createUserForm, setCreateUserForm] = useState({
     firstName: '',
     lastName: '',
@@ -45,9 +50,21 @@ const Settings = () => {
     title: 'Agent',
     phone: ''
   });
+  const [editUserForm, setEditUserForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    role: 'agent',
+    title: 'Agent',
+    phone: ''
+  });
   const [createUserLoading, setCreateUserLoading] = useState(false);
+  const [editUserLoading, setEditUserLoading] = useState(false);
+  const [deleteUserLoading, setDeleteUserLoading] = useState(false);
   const [createUserError, setCreateUserError] = useState('');
+  const [editUserError, setEditUserError] = useState('');
   const [createUserSuccess, setCreateUserSuccess] = useState('');
+  const [editUserSuccess, setEditUserSuccess] = useState('');
   const [allUsers, setAllUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
 
@@ -164,6 +181,100 @@ const Settings = () => {
     });
     setCreateUserError('');
     setCreateUserSuccess('');
+  };
+
+  // Edit user functions
+  const handleEditUser = (userItem) => {
+    setSelectedUser(userItem);
+    setEditUserForm({
+      firstName: userItem.firstName || '',
+      lastName: userItem.lastName || '',
+      email: userItem.email || '',
+      role: userItem.role || 'agent',
+      title: userItem.title || 'Agent',
+      phone: userItem.phone || ''
+    });
+    setShowEditUserModal(true);
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    setEditUserLoading(true);
+    setEditUserError('');
+    setEditUserSuccess('');
+
+    try {
+      await userAPI.updateUser(selectedUser._id, editUserForm);
+      setEditUserSuccess('User updated successfully!');
+      
+      // Refresh users list
+      const users = await userAPI.getUsers();
+      setAllUsers(users);
+      
+      // Close modal after a short delay
+      setTimeout(() => {
+        setShowEditUserModal(false);
+        setEditUserSuccess('');
+        setSelectedUser(null);
+      }, 2000);
+    } catch (error) {
+      setEditUserError(error.message || 'Failed to update user');
+    } finally {
+      setEditUserLoading(false);
+    }
+  };
+
+  const handleEditUserFormChange = (field, value) => {
+    setEditUserForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const closeEditUserModal = () => {
+    setShowEditUserModal(false);
+    setSelectedUser(null);
+    setEditUserForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      role: 'agent',
+      title: 'Agent',
+      phone: ''
+    });
+    setEditUserError('');
+    setEditUserSuccess('');
+  };
+
+  // Delete user functions
+  const handleDeleteUser = (userItem) => {
+    setSelectedUser(userItem);
+    setShowDeleteUserModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    setDeleteUserLoading(true);
+
+    try {
+      await userAPI.deleteUser(selectedUser._id);
+      
+      // Refresh users list
+      const users = await userAPI.getUsers();
+      setAllUsers(users);
+      
+      setShowDeleteUserModal(false);
+      setSelectedUser(null);
+      alert('User deleted successfully!');
+    } catch (error) {
+      alert(error.message || 'Failed to delete user');
+    } finally {
+      setDeleteUserLoading(false);
+    }
+  };
+
+  const closeDeleteUserModal = () => {
+    setShowDeleteUserModal(false);
+    setSelectedUser(null);
   };
 
   return (
@@ -395,18 +506,19 @@ const Settings = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ROLE</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">TITLE</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {usersLoading ? (
                     <tr>
-                      <td colSpan="5" className="px-6 py-4 text-center">
+                      <td colSpan="6" className="px-6 py-4 text-center">
                         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
                       </td>
                     </tr>
                   ) : allUsers.length === 0 ? (
                     <tr>
-                      <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                      <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
                         No users found
                       </td>
                     </tr>
@@ -449,6 +561,24 @@ const Settings = () => {
                           <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                             Active
                           </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => handleEditUser(userItem)}
+                              className="text-blue-600 hover:text-blue-800 transition-colors"
+                              title="Edit User"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(userItem)}
+                              className="text-red-600 hover:text-red-800 transition-colors"
+                              title="Delete User"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -644,6 +774,186 @@ const Settings = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit User Modal */}
+      {showEditUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Edit User</h2>
+              <button onClick={closeEditUserModal} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Success Message */}
+            {editUserSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <p className="text-green-800 text-sm">{editUserSuccess}</p>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {editUserError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                <p className="text-red-800 text-sm">{editUserError}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                  <input
+                    type="text"
+                    value={editUserForm.firstName}
+                    onChange={(e) => handleEditUserFormChange('firstName', e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                  <input
+                    type="text"
+                    value={editUserForm.lastName}
+                    onChange={(e) => handleEditUserFormChange('lastName', e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editUserForm.email}
+                  onChange={(e) => handleEditUserFormChange('email', e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={editUserForm.role}
+                    onChange={(e) => handleEditUserFormChange('role', e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="agent">Agent</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={editUserForm.title}
+                    onChange={(e) => handleEditUserFormChange('title', e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Sales Agent"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (Optional)</label>
+                <input
+                  type="tel"
+                  value={editUserForm.phone}
+                  onChange={(e) => handleEditUserFormChange('phone', e.target.value)}
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="+1234567890"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={closeEditUserModal}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                  disabled={editUserLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editUserLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+                >
+                  {editUserLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Updating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Edit className="w-4 h-4" />
+                      <span>Update User</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+      {showDeleteUserModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">Delete User</h2>
+              <button onClick={closeDeleteUserModal} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete the user <strong>{selectedUser?.firstName} {selectedUser?.lastName}</strong>?
+              </p>
+              <p className="text-sm text-red-600">
+                This action cannot be undone. The user will be permanently removed from the system.
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={closeDeleteUserModal}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={deleteUserLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteUser}
+                disabled={deleteUserLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+              >
+                {deleteUserLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete User</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
