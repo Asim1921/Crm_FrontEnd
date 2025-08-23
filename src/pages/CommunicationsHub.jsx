@@ -1002,27 +1002,14 @@ Copy this message and paste it in the chat:
                     )}
                   </div>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button 
                     onClick={() => handleCall('voip')}
                     disabled={twilioStatus === 'error'}
-                    className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
                     <Phone className="w-4 h-4" />
                     <span>Call</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                      // Quick test call without client selection
-                      const demoClientId = clients.length > 0 ? clients[0]._id : 'demo-client-123';
-                      initiateTwilioCall('+923405735723', demoClientId);
-                    }}
-                    disabled={twilioStatus === 'error'}
-                    className="bg-purple-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                    title="Quick test call"
-                  >
-                    <Phone className="w-4 h-4" />
-                    <span>Test Call</span>
                   </button>
                   <button 
                     onClick={() => {
@@ -1031,7 +1018,7 @@ Copy this message and paste it in the chat:
                       const demoPhoneNumber = callData.phoneNumber || '+923405735723';
                       makeBrowserCall(demoPhoneNumber, demoClientId);
                     }}
-                    className="bg-green-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-sm"
+                    className="bg-green-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm"
                     title="Make call with browser microphone"
                   >
                     <Mic className="w-4 h-4" />
