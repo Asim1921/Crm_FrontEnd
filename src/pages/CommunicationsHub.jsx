@@ -21,8 +21,7 @@ import {
   MicOff,
   PhoneOff
 } from 'lucide-react';
-import { communicationAPI, clientAPI } from '../utils/api';
-import twilioAPI from '../utils/twilioAPI';
+import { communicationAPI, clientAPI, twilioAPI } from '../utils/api';
 
 
 const CommunicationsHub = () => {
@@ -162,10 +161,10 @@ Best regards,
     }
   };
 
-  const initiateTwilioCall = async (phoneNumber) => {
+  const initiateTwilioCall = async (phoneNumber, clientId) => {
     try {
       // Validate and format phone number
-      const validatedNumber = twilioAPI.validatePhoneNumber(phoneNumber);
+      const validatedNumber = validatePhoneNumber(phoneNumber);
       if (!validatedNumber) {
         alert('Invalid phone number format. Please enter a valid number.');
         return;
@@ -173,8 +172,11 @@ Best regards,
 
       setTwilioStatus('connecting');
       
-      // Make the call using Twilio API
-      const callResult = await twilioAPI.makeCall(validatedNumber);
+      // Make the call using new Twilio API
+      const callResult = await twilioAPI.makeCall({
+        clientId: clientId,
+        phoneNumber: validatedNumber
+      });
       
       if (callResult.success) {
         setCurrentCall({
@@ -182,21 +184,21 @@ Best regards,
           startTime: new Date(),
           status: 'connecting',
           callSid: callResult.callSid,
-          twilioStatus: callResult.status
+          twilioStatus: callResult.status,
+          communicationId: callResult.communicationId
         });
         
         setTwilioStatus('connected');
         
         // Add notification
-        addCallNotification({
-          type: 'outgoing',
-          number: validatedNumber,
-          status: 'initiated',
-          timestamp: new Date()
-        });
+        addCallNotification(
+          formatPhoneNumber(validatedNumber),
+          'Client',
+          callResult.communicationId
+        );
       } else {
         setTwilioStatus('error');
-        alert(`❌ Call Failed: ${callResult.error}`);
+        alert(`❌ Call Failed: ${callResult.message || callResult.error}`);
       }
     } catch (error) {
       console.error('Error initiating Twilio call:', error);
@@ -268,6 +270,35 @@ Best regards,
     console.log('Hold toggled:', !isOnHold);
   };
 
+  // Helper functions for phone number validation and formatting
+  const validatePhoneNumber = (phoneNumber) => {
+    // Remove all non-digit characters
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    
+    // Check if it's a valid US number (10 digits) or international (11+ digits)
+    if (cleaned.length === 10) {
+      return `+1${cleaned}`; // Add US country code
+    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+${cleaned}`; // Already has US country code
+    } else if (cleaned.length >= 10) {
+      return `+${cleaned}`; // International number
+    }
+    
+    return null; // Invalid number
+  };
+
+  const formatPhoneNumber = (phoneNumber) => {
+    const cleaned = phoneNumber.replace(/\D/g, '');
+    
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
+    } else if (cleaned.length === 11 && cleaned.startsWith('1')) {
+      return `+1 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7)}`;
+    }
+    
+    return phoneNumber; // Return as-is if can't format
+  };
+
   // Browser-based voice call functions
   const initializeBrowserCall = async () => {
     try {
@@ -290,7 +321,7 @@ Best regards,
     }
   };
 
-  const makeBrowserCall = async (toNumber) => {
+  const makeBrowserCall = async (toNumber, clientId) => {
     try {
       if (!browserDevice) {
         const initialized = await initializeBrowserCall();
@@ -300,7 +331,10 @@ Best regards,
       console.log(`Making browser call to ${toNumber}`);
       
       // For now, use the regular Twilio API call but with browser microphone access
-      const result = await twilioAPI.makeCall(toNumber);
+      const result = await twilioAPI.makeCall({
+        clientId: clientId,
+        phoneNumber: toNumber
+      });
       
       if (result.success) {
         setIsBrowserCallActive(true);
@@ -573,7 +607,7 @@ Best regards,
       
       // Use Twilio for VoIP calls
       if (callData.channel === 'voip') {
-        await initiateTwilioCall(callData.phoneNumber);
+        await initiateTwilioCall(callData.phoneNumber, callData.clientId);
       } else {
         // Fallback to regular phone call
         window.open(`tel:${callData.phoneNumber}`, '_self');
@@ -978,7 +1012,25 @@ Copy this message and paste it in the chat:
                     <span>Call</span>
                   </button>
                   <button 
-                    onClick={() => makeBrowserCall(callData.phoneNumber || '+923405735723')}
+                    onClick={() => {
+                      // Quick test call without client selection
+                      const demoClientId = clients.length > 0 ? clients[0]._id : 'demo-client-123';
+                      initiateTwilioCall('+923405735723', demoClientId);
+                    }}
+                    disabled={twilioStatus === 'error'}
+                    className="bg-purple-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    title="Quick test call"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span>Test Call</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      // Use first available client or create a demo call
+                      const demoClientId = clients.length > 0 ? clients[0]._id : 'demo-client-123';
+                      const demoPhoneNumber = callData.phoneNumber || '+923405735723';
+                      makeBrowserCall(demoPhoneNumber, demoClientId);
+                    }}
                     className="bg-green-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2 text-sm"
                     title="Make call with browser microphone"
                   >
@@ -1003,7 +1055,7 @@ Copy this message and paste it in the chat:
                      </span>
               </div>
 
-                   <p className="text-xs lg:text-sm text-green-700 mb-3">Calling: {twilioAPI.formatPhoneNumber(currentCall.number)}</p>
+                   <p className="text-xs lg:text-sm text-green-700 mb-3">Calling: {formatPhoneNumber(currentCall.number)}</p>
                    
                    {currentCall.callSid && (
                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">

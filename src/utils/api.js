@@ -285,6 +285,35 @@ export const communicationAPI = {
   }
 };
 
+// Twilio API calls
+export const twilioAPI = {
+  makeCall: async (callData) => {
+    return apiRequest('/twilio/call', {
+      method: 'POST',
+      body: JSON.stringify(callData)
+    });
+  },
+
+  endCall: async (callSid) => {
+    return apiRequest('/twilio/end-call', {
+      method: 'POST',
+      body: JSON.stringify({ callSid })
+    });
+  },
+
+  getCallStatus: async (callSid) => {
+    return apiRequest(`/twilio/call-status/${callSid}`);
+  },
+
+  getRecentCalls: async (limit = 10) => {
+    return apiRequest(`/twilio/recent-calls?limit=${limit}`);
+  },
+
+  getAccountInfo: async () => {
+    return apiRequest('/twilio/account-info');
+  }
+};
+
 // Export default for convenience
 export default {
   auth: authAPI,
