@@ -1684,23 +1684,6 @@ Copy this message and paste it in the chat:
                   </p>
                 </div>
 
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-3">Current Configuration:</h4>
-                  <div className="space-y-4">
-                    <div className="bg-green-50 rounded-lg p-4">
-                      <h5 className="font-medium text-green-900 mb-2">Account Information:</h5>
-                      <div className="text-sm text-green-800 space-y-1">
-                        <p><strong>Account SID:</strong> AC2e749f3b25fc86afa0dd6937206d95ec</p>
-                        <p><strong>Phone Number:</strong> +1 (443) 320-6038</p>
-                        <p><strong>Status:</strong> {twilioStatus === 'connected' ? 'Connected' : 'Disconnected'}</p>
-                        {accountInfo && (
-                          <p><strong>Balance:</strong> ${accountInfo.balance} {accountInfo.currency}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="bg-yellow-50 rounded-lg p-4">
                   <h4 className="font-medium text-yellow-900 mb-2">How It Works:</h4>
                   <ul className="text-sm text-yellow-800 space-y-1">
