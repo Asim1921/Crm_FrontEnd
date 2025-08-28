@@ -85,10 +85,14 @@ const ClientManagement = () => {
         return 'bg-green-100 text-green-800';
       case 'FTD':
         return 'bg-blue-100 text-blue-800';
+      case 'FTD RETENTION':
+        return 'bg-indigo-100 text-indigo-800';
       case 'Call Again':
         return 'bg-orange-100 text-orange-800';
       case 'No Answer':
-        return 'bg-red-100 text-red-800';
+        return 'bg-pink-100 text-pink-800';
+      case 'NA5UP':
+        return 'bg-teal-100 text-teal-800';
       case 'Not Interested':
         return 'bg-gray-100 text-gray-800';
       case 'Hang Up':
@@ -109,44 +113,44 @@ const ClientManagement = () => {
   };
 
   // Fetch clients and analytics data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch clients with 5 records per page
-        const params = {
-          page: currentPage,
-          limit: 5, // Changed from 10 to 5
-          ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-          ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
-          ...(statusFilter === 'Data' && { campaign: 'Data' }),
-          ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
-          ...(countryFilter !== 'all' && { country: countryFilter }),
-          ...(agentFilter !== 'all' && { agent: agentFilter })
-        };
-        
-        const clientsData = await clientAPI.getClients(params);
-        setClients(clientsData.clients || []);
-        setPagination(clientsData.pagination || {});
-        
-        // Fetch analytics
-        const analyticsData = await reportsAPI.getAnalytics();
-        setAnalytics({
-          clientsByCountry: analyticsData.clientsByCountry || [],
-          leadStatusOverview: analyticsData.leadStatusDistribution || [],
-          totalClients: clientsData.pagination?.total || 0
-        });
-        
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch clients with 5 records per page
+      const params = {
+        page: currentPage,
+        limit: 5, // Changed from 10 to 5
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
+        ...(statusFilter === 'Data' && { campaign: 'Data' }),
+        ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
+        ...(countryFilter !== 'all' && { country: countryFilter }),
+        ...(agentFilter !== 'all' && { agent: agentFilter })
+      };
+      
+      const clientsData = await clientAPI.getClients(params);
+      setClients(clientsData.clients || []);
+      setPagination(clientsData.pagination || {});
+      
+      // Fetch analytics
+      const analyticsData = await reportsAPI.getAnalytics();
+      setAnalytics({
+        clientsByCountry: analyticsData.clientsByCountry || [],
+        leadStatusOverview: analyticsData.leadStatusDistribution || [],
+        totalClients: clientsData.pagination?.total || 0
+      });
+      
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchData();
   }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter]);
 
@@ -221,7 +225,7 @@ const ClientManagement = () => {
       await clientAPI.assignClients(Array.from(selectedClients), assignToAgent);
       alert('Clients assigned successfully!');
       // Refresh data after assignment
-      window.location.reload();
+      fetchData();
     } catch (err) {
       console.error('Error assigning clients:', err);
       alert('Failed to assign clients: ' + (err.message || 'Unknown error'));
@@ -317,7 +321,7 @@ const ClientManagement = () => {
        alert(`Successfully imported ${clientsData.length} clients!`);
        setShowImportModal(false);
        setImportFile(null);
-       window.location.reload();
+       fetchData();
      } catch (err) {
        console.error('Error importing clients:', err);
        alert('Failed to import clients: ' + (err.message || 'Unknown error'));
@@ -346,7 +350,9 @@ const ClientManagement = () => {
         status: 'New Lead',
         campaign: 'Data'
       });
-      window.location.reload();
+      
+      // Refresh clients list instead of reloading the page
+      fetchData();
     } catch (err) {
       console.error('Error adding client:', err);
       alert('Failed to add client: ' + (err.message || 'Unknown error'));
@@ -363,13 +369,17 @@ const ClientManagement = () => {
     // Format phone number (remove any non-digit characters)
     const phoneNumber = client.phone.replace(/\D/g, '');
     
-    // Open dialer
+    // Open dialer with hidden number for agents
     const telUrl = `tel:${phoneNumber}`;
     window.open(telUrl, '_self');
     
-    // Show success message
+    // Show success message (hide phone number for agents)
     setTimeout(() => {
-      alert(`Calling ${client.firstName} ${client.lastName} at ${client.phone}`);
+      if (user?.role === 'admin') {
+        alert(`Calling ${client.firstName} ${client.lastName} at ${client.phone}`);
+      } else {
+        alert(`Calling ${client.firstName} ${client.lastName}`);
+      }
     }, 100);
   };
 
@@ -407,9 +417,13 @@ const ClientManagement = () => {
       window.open(mailtoUrl, '_self');
     }
     
-    // Show success message
+    // Show success message (hide email for agents)
     setTimeout(() => {
-      alert(`${provider} opened for ${client.firstName} ${client.lastName} with pre-filled email`);
+      if (user?.role === 'admin') {
+        alert(`${provider} opened for ${client.firstName} ${client.lastName} with pre-filled email`);
+      } else {
+        alert(`${provider} opened for ${client.firstName} ${client.lastName}`);
+      }
     }, 100);
   };
 
@@ -571,12 +585,18 @@ const ClientManagement = () => {
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
-                  {user?.role === 'admin' && (
-                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
-                  )}
-                  {user?.role === 'admin' && (
-                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
-                  )}
+                                     {user?.role === 'admin' && (
+                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
+                   )}
+                   {user?.role === 'admin' && (
+                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
+                   )}
+                   {user?.role === 'agent' && (
+                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
+                   )}
+                   {user?.role === 'agent' && (
+                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
+                   )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
@@ -612,12 +632,18 @@ const ClientManagement = () => {
                        </div>
                      </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.country}</td>
-                     {user?.role === 'admin' && (
-                       <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.phone}</td>
-                     )}
-                     {user?.role === 'admin' && (
-                       <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.email}</td>
-                     )}
+                                           {user?.role === 'admin' && (
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.phone}</td>
+                      )}
+                      {user?.role === 'admin' && (
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.email}</td>
+                      )}
+                      {user?.role === 'agent' && (
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-400">••••••••••</td>
+                      )}
+                      {user?.role === 'agent' && (
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-400">••••••••••</td>
+                      )}
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                        {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
                      </td>
@@ -763,8 +789,10 @@ const ClientManagement = () => {
                    <div className={`w-3 h-3 rounded-full mr-3 ${
                      status._id === 'New Lead' ? 'bg-green-500' :
                      status._id === 'FTD' ? 'bg-blue-500' :
+                     status._id === 'FTD RETENTION' ? 'bg-indigo-500' :
                      status._id === 'Call Again' ? 'bg-orange-500' :
-                     status._id === 'No Answer' ? 'bg-red-500' :
+                     status._id === 'No Answer' ? 'bg-pink-500' :
+                     status._id === 'NA5UP' ? 'bg-teal-500' :
                      status._id === 'Not Interested' ? 'bg-gray-500' :
                      status._id === 'Hang Up' ? 'bg-purple-500' :
                      'bg-gray-400'

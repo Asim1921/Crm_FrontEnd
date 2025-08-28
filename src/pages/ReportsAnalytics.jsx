@@ -91,18 +91,22 @@ const ReportsAnalytics = () => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'FTD':
+      case 'New Lead':
         return 'bg-green-100 text-green-800';
+      case 'FTD':
+        return 'bg-blue-100 text-blue-800';
+      case 'FTD RETENTION':
+        return 'bg-indigo-100 text-indigo-800';
       case 'Call Again':
         return 'bg-orange-100 text-orange-800';
       case 'No Answer':
-        return 'bg-red-100 text-red-800';
+        return 'bg-pink-100 text-pink-800';
+      case 'NA5UP':
+        return 'bg-teal-100 text-teal-800';
       case 'Not Interested':
         return 'bg-gray-100 text-gray-800';
-      case 'New Lead':
-        return 'bg-blue-100 text-blue-800';
       case 'Hang Up':
-        return 'bg-red-100 text-red-800';
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -173,12 +177,14 @@ const ReportsAnalytics = () => {
     if (!analytics?.leadStatusDistribution) return [];
     
     const statusColors = {
-      'FTD': { color: 'bg-green-500', bgColor: 'bg-green-50', textColor: 'text-green-700' },
+      'New Lead': { color: 'bg-green-500', bgColor: 'bg-green-50', textColor: 'text-green-700' },
+      'FTD': { color: 'bg-blue-500', bgColor: 'bg-blue-50', textColor: 'text-blue-700' },
+      'FTD RETENTION': { color: 'bg-indigo-500', bgColor: 'bg-indigo-50', textColor: 'text-indigo-700' },
       'Call Again': { color: 'bg-orange-500', bgColor: 'bg-orange-50', textColor: 'text-orange-700' },
-      'Not Interested': { color: 'bg-red-500', bgColor: 'bg-red-50', textColor: 'text-red-700' },
-      'No Answer': { color: 'bg-gray-500', bgColor: 'bg-gray-50', textColor: 'text-gray-700' },
-      'New Lead': { color: 'bg-blue-500', bgColor: 'bg-blue-50', textColor: 'text-blue-700' },
-      'Hang Up': { color: 'bg-red-500', bgColor: 'bg-red-50', textColor: 'text-red-700' }
+      'No Answer': { color: 'bg-pink-500', bgColor: 'bg-pink-50', textColor: 'text-pink-700' },
+      'NA5UP': { color: 'bg-teal-500', bgColor: 'bg-teal-50', textColor: 'text-teal-700' },
+      'Not Interested': { color: 'bg-gray-500', bgColor: 'bg-gray-50', textColor: 'text-gray-700' },
+      'Hang Up': { color: 'bg-purple-500', bgColor: 'bg-purple-50', textColor: 'text-purple-700' }
     };
 
     return analytics.leadStatusDistribution.map(item => ({
@@ -604,8 +610,10 @@ const ReportsAnalytics = () => {
                 >
                   <option value="New Lead">New Lead</option>
                   <option value="FTD">FTD</option>
+                  <option value="FTD RETENTION">FTD RETENTION</option>
                   <option value="Call Again">Call Again</option>
                   <option value="No Answer">No Answer</option>
+                  <option value="NA5UP">NA5UP</option>
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
                 </select>

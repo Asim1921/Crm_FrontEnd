@@ -21,16 +21,22 @@ class TwilioAPI {
   }
 
   // Make a voice call using Twilio
-  async makeCall(toNumber, fromNumber = this.phoneNumber) {
+  async makeCall(params) {
     try {
-      console.log(`Making Twilio call to ${toNumber} from ${fromNumber}`);
+      const { clientId, phoneNumber, useBrowserCall = false } = params;
+      const toNumber = phoneNumber;
+      const fromNumber = this.phoneNumber;
+      
+      console.log(`Making Twilio call to ${toNumber} from ${fromNumber}, browser call: ${useBrowserCall}`);
       
       // Use the original number since it's verified
       let testNumber = toNumber;
       
-      // For now, use the simple webhook approach to avoid double calls
-      const webhookUrl = 'https://c03b148fdcfb.ngrok-free.app/twiml/voice';
-      const statusCallbackUrl = 'https://c03b148fdcfb.ngrok-free.app/api/call-status';
+      // Choose webhook URL based on call type
+      const webhookUrl = useBrowserCall 
+        ? 'https://2a152400c10e.ngrok-free.app/twiml/browser-call'
+        : 'https://2a152400c10e.ngrok-free.app/twiml/voice';
+      const statusCallbackUrl = 'https://2a152400c10e.ngrok-free.app/api/call-status';
       
       const response = await fetch(`${this.baseUrl}/Accounts/${this.accountSid}/Calls.json`, {
         method: 'POST',
@@ -61,6 +67,7 @@ class TwilioAPI {
         callSid: callData.sid,
         status: callData.status,
         data: callData,
+        communicationId: callData.sid, // Use call SID as communication ID
       };
     } catch (error) {
       console.error('Error making Twilio call:', error);

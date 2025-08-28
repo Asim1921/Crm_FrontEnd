@@ -738,8 +738,10 @@ const Dashboard = () => {
                       <div className={`w-3 h-3 rounded-full mr-3 ${
                         status._id === 'New Lead' ? 'bg-green-500' :
                         status._id === 'FTD' ? 'bg-blue-500' :
+                        status._id === 'FTD RETENTION' ? 'bg-indigo-500' :
                         status._id === 'Call Again' ? 'bg-orange-500' :
-                        status._id === 'No Answer' ? 'bg-red-500' :
+                        status._id === 'No Answer' ? 'bg-pink-500' :
+                        status._id === 'NA5UP' ? 'bg-teal-500' :
                         status._id === 'Not Interested' ? 'bg-gray-500' :
                         status._id === 'Hang Up' ? 'bg-purple-500' :
                         'bg-gray-400'
@@ -1147,11 +1149,13 @@ const Dashboard = () => {
                 Client: <span className="font-medium">{selectedClient.firstName} {selectedClient.lastName}</span>
               </p>
               <p className="text-sm text-gray-600 mb-4">
-                Current Status: <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                Current Status:                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                   selectedClient.status === 'New Lead' ? 'bg-green-100 text-green-800' :
                   selectedClient.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
+                  selectedClient.status === 'FTD RETENTION' ? 'bg-indigo-100 text-indigo-800' :
                   selectedClient.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
-                  selectedClient.status === 'No Answer' ? 'bg-red-100 text-red-800' :
+                  selectedClient.status === 'No Answer' ? 'bg-pink-100 text-pink-800' :
+                  selectedClient.status === 'NA5UP' ? 'bg-teal-100 text-teal-800' :
                   selectedClient.status === 'Not Interested' ? 'bg-gray-100 text-gray-800' :
                   selectedClient.status === 'Hang Up' ? 'bg-purple-100 text-purple-800' :
                   'bg-gray-100 text-gray-800'
@@ -1167,11 +1171,13 @@ const Dashboard = () => {
               >
                 <option value="">Select Status</option>
                 <option value="New Lead">New Lead</option>
+                <option value="FTD">FTD</option>
+                <option value="FTD RETENTION">FTD RETENTION</option>
                 <option value="Call Again">Call Again</option>
                 <option value="No Answer">No Answer</option>
+                <option value="NA5UP">NA5UP</option>
                 <option value="Not Interested">Not Interested</option>
                 <option value="Hang Up">Hang Up</option>
-                <option value="FTD">FTD</option>
               </select>
             </div>
             <div className="flex justify-end space-x-3">

@@ -22,6 +22,8 @@ import {
   PhoneOff
 } from 'lucide-react';
 import { communicationAPI, clientAPI, twilioAPI } from '../utils/api';
+import BrowserCallInterface from '../components/BrowserCallInterface';
+
 
 
 const CommunicationsHub = () => {
@@ -66,8 +68,10 @@ const CommunicationsHub = () => {
   
   // Browser-based voice call states
   const [browserDevice, setBrowserDevice] = useState(null);
-  const [browserCall, setBrowserCall] = useState(null);
-  const [isBrowserCallActive, setIsBrowserCallActive] = useState(false);
+  const [showBrowserCall, setShowBrowserCall] = useState(false);
+  const [selectedClientForCall, setSelectedClientForCall] = useState(null);
+
+
   
   // Call search functionality
   const [searchAgent, setSearchAgent] = useState('');
@@ -170,12 +174,24 @@ Best regards,
         return;
       }
 
+      // Request microphone permissions first for browser-based calling
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        console.log('Microphone permission granted');
+        stream.getTracks().forEach(track => track.stop()); // Stop the stream after permission
+      } catch (micError) {
+        console.warn('Microphone permission denied:', micError);
+        alert('Microphone permission is required for calling. Please enable it and try again.');
+        return;
+      }
+
       setTwilioStatus('connecting');
       
-      // Make the call using new Twilio API
+      // Make the call using new Twilio API with browser-based calling
       const callResult = await twilioAPI.makeCall({
         clientId: clientId,
-        phoneNumber: validatedNumber
+        phoneNumber: validatedNumber,
+        useBrowserCall: true // Enable browser-based calling
       });
       
       if (callResult.success) {
@@ -185,7 +201,8 @@ Best regards,
           status: 'connecting',
           callSid: callResult.callSid,
           twilioStatus: callResult.status,
-          communicationId: callResult.communicationId
+          communicationId: callResult.communicationId,
+          isBrowserCall: true
         });
         
         setTwilioStatus('connected');
@@ -321,79 +338,9 @@ Best regards,
     }
   };
 
-  const makeBrowserCall = async (toNumber, clientId) => {
-    try {
-      if (!browserDevice) {
-        const initialized = await initializeBrowserCall();
-        if (!initialized) return;
-      }
 
-      console.log(`Making browser call to ${toNumber}`);
-      
-      // For now, use the regular Twilio API call but with browser microphone access
-      const result = await twilioAPI.makeCall({
-        clientId: clientId,
-        phoneNumber: toNumber
-      });
-      
-      if (result.success) {
-        setIsBrowserCallActive(true);
-        setBrowserCall({
-          callSid: result.callSid,
-          toNumber: toNumber,
-          startTime: new Date(),
-          status: 'in-progress'
-        });
-        
-        // Add to call history
-        setCallHistory(prev => [...prev, {
-          callSid: result.callSid,
-          toNumber: toNumber,
-          startTime: new Date(),
-          status: 'in-progress',
-          type: 'browser'
-        }]);
-        
-        console.log('Browser call initiated successfully');
-        alert('✅ Browser call initiated! Your microphone is active and connected to the call.');
-      } else {
-        console.error('Failed to initiate browser call:', result.error);
-        alert('Failed to initiate browser call: ' + result.error);
-      }
-      
-    } catch (error) {
-      console.error('Error making browser call:', error);
-      alert('Error making browser call: ' + error.message);
-    }
-  };
 
-  const endBrowserCall = () => {
-    if (browserCall && browserCall.connection) {
-      // Disconnect the Twilio call
-      browserCall.connection.disconnect();
-    }
-    
-    if (browserCall) {
-      const callEndTime = new Date();
-      const callDuration = Math.round((callEndTime - browserCall.startTime) / 1000);
-      
-      setCallHistory(prev => [...prev, {
-        ...browserCall,
-        endTime: callEndTime,
-        duration: callDuration,
-        status: 'completed'
-      }]);
-    }
-    
-    setBrowserCall(null);
-    setIsBrowserCallActive(false);
-    
-    // Stop microphone stream
-    if (browserDevice && browserDevice.stream) {
-      browserDevice.stream.getTracks().forEach(track => track.stop());
-      setBrowserDevice(null);
-    }
-  };
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -491,6 +438,36 @@ Best regards,
 
   const handleAddAgent = () => {
     setShowAddAgentModal(true);
+  };
+
+  const makeBrowserCall = async () => {
+    try {
+      // Open browser call with NO pre-filled data
+      setSelectedClientForCall(null);
+      setShowBrowserCall(true);
+      
+      console.log('Browser call interface opened with blank fields');
+    } catch (error) {
+      console.error('Error opening browser call interface:', error);
+      alert('Error opening browser call interface: ' + error.message);
+    }
+  };
+
+  const handleBrowserCallEnd = () => {
+    setShowBrowserCall(false);
+    setSelectedClientForCall(null);
+    
+    // Add to call history
+    if (selectedClientForCall) {
+      setCallHistory(prev => [...prev, {
+        number: selectedClientForCall.phone,
+        startTime: new Date(),
+        endTime: new Date(),
+        duration: 0,
+        status: 'completed',
+        type: 'browser'
+      }]);
+    }
   };
 
   const submitAddAgent = async () => {
@@ -1011,12 +988,11 @@ Copy this message and paste it in the chat:
                     <Phone className="w-4 h-4" />
                     <span>Call</span>
                   </button>
+                  
                   <button 
                     onClick={() => {
-                      // Use first available client or create a demo call
-                      const demoClientId = clients.length > 0 ? clients[0]._id : 'demo-client-123';
-                      const demoPhoneNumber = callData.phoneNumber || '+923405735723';
-                      makeBrowserCall(demoPhoneNumber, demoClientId);
+                      // Open browser call with NO pre-filled data
+                      makeBrowserCall();
                     }}
                     className="bg-green-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-sm"
                     title="Make call with browser microphone"
@@ -1734,6 +1710,27 @@ Copy this message and paste it in the chat:
           </div>
         )}
 
+        {/* Browser Call Modal */}
+        {showBrowserCall && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Browser Call</h3>
+                <button 
+                  onClick={() => setShowBrowserCall(false)} 
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <BrowserCallInterface 
+                onCallEnd={handleBrowserCallEnd}
+                clientInfo={selectedClientForCall}
+              />
+            </div>
+          </div>
+        )}
 
     </div>
   );

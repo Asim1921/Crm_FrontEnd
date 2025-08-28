@@ -17,10 +17,28 @@ const apiRequest = async (endpoint, options = {}) => {
       headers: getAuthHeaders(),
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      // Handle non-JSON responses (like rate limit HTML pages)
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      } else if (response.status >= 500) {
+        throw new Error('Server error. Please try again later.');
+      } else {
+        throw new Error('Invalid response from server.');
+      }
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || 'API request failed');
+      // Handle rate limiting specifically
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After') || '15';
+        throw new Error(`Rate limit exceeded. Please wait ${retryAfter} minutes before trying again.`);
+      }
+      
+      throw new Error(data.message || data.error || 'API request failed');
     }
 
     return data;
@@ -41,6 +59,19 @@ export const authAPI = {
 
   getMe: async () => {
     return apiRequest('/auth/me');
+  },
+
+  refreshToken: async (refreshToken) => {
+    return apiRequest('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refreshToken })
+    });
+  },
+
+  logout: async () => {
+    return apiRequest('/auth/logout', {
+      method: 'POST'
+    });
   }
 };
 
