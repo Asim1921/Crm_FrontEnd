@@ -120,6 +120,13 @@ export const clientAPI = {
     });
   },
 
+  deleteClients: async (clientIds) => {
+    return apiRequest('/clients/bulk-delete', {
+      method: 'DELETE',
+      body: JSON.stringify({ clientIds })
+    });
+  },
+
   exportClients: async (format = 'csv') => {
     const response = await fetch('/api/clients/export?format=' + format, {
       headers: getAuthHeaders(),

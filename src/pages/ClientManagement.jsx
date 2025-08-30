@@ -54,7 +54,6 @@ const ClientManagement = () => {
   const [showImportModal, setShowImportModal] = useState(false);
   const [newClient, setNewClient] = useState({
     firstName: '',
-    lastName: '',
     email: '',
     phone: '',
     country: '',
@@ -117,10 +116,10 @@ const ClientManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch clients with 5 records per page
+      // Fetch clients with 50 records per page
       const params = {
         page: currentPage,
-        limit: 5, // Changed from 10 to 5
+        limit: 50, // Changed from 5 to 50
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
         ...(statusFilter === 'Data' && { campaign: 'Data' }),
@@ -232,6 +231,35 @@ const ClientManagement = () => {
     }
   };
 
+  // Handle delete selected clients
+  const handleDeleteClients = async () => {
+    if (selectedClients.size === 0) {
+      alert('Please select clients to delete');
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selectedClients.size} selected client(s)? This action cannot be undone.`
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      // API call to delete clients
+      await clientAPI.deleteClients(Array.from(selectedClients));
+      alert(`${selectedClients.size} client(s) deleted successfully!`);
+      // Clear selection and refresh data
+      setSelectedClients(new Set());
+      setSelectAll(false);
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting clients:', err);
+      alert('Failed to delete clients: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   // Handle export clients
   const handleExportClients = async () => {
     try {
@@ -280,37 +308,33 @@ const ClientManagement = () => {
          return;
        }
 
-       // Parse data rows
-       const clientsData = lines.slice(1).map((line, index) => {
-         const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-         
-         if (values.length !== expectedHeaders.length) {
-           throw new Error(`Row ${index + 2} has ${values.length} columns, expected ${expectedHeaders.length}`);
-         }
+               // Parse data rows
+        const clientsData = lines.slice(1).map((line, index) => {
+          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+          
+          if (values.length !== expectedHeaders.length) {
+            throw new Error(`Row ${index + 2} has ${values.length} columns, expected ${expectedHeaders.length}`);
+          }
 
-         // Split name into firstName and lastName
-         const fullName = values[0] || '';
-         const nameParts = fullName.trim().split(' ');
-         const firstName = nameParts[0] || '';
-         const lastName = nameParts.slice(1).join(' ') || '';
+          // Use full name as firstName
+          const fullName = values[0] || '';
 
-         return {
-           firstName,
-           lastName,
-           email: values[1] || '',
-           phone: values[2] || '', // number or phone column
-           country: values[3] || '',
-           status: 'New Lead', // Default status
-           campaign: 'Data' // Default campaign
-         };
-       }).filter(client => {
-         // Validate required fields
-         if (!client.firstName || !client.email) {
-           console.warn(`Skipping row: missing firstName or email`);
-           return false;
-         }
-         return true;
-       });
+          return {
+            firstName: fullName,
+            email: values[1] || '',
+            phone: values[2] || '', // number or phone column
+            country: values[3] || '',
+            status: 'New Lead', // Default status
+            campaign: 'Data' // Default campaign
+          };
+        }).filter(client => {
+          // Validate required fields
+          if (!client.firstName || !client.email) {
+            console.warn(`Skipping row: missing firstName or email`);
+            return false;
+          }
+          return true;
+        });
 
        if (clientsData.length === 0) {
          alert('No valid client data found. Please check your CSV format.');
@@ -334,7 +358,7 @@ const ClientManagement = () => {
   const handleAddClient = async () => {
     try {
       const response = await clientAPI.createClient(newClient);
-      const clientName = `${newClient.firstName} ${newClient.lastName}`;
+      const clientName = newClient.firstName;
       
       // Add notification for new client
       addClientNotification('created', clientName, response._id || 'new-client');
@@ -343,7 +367,6 @@ const ClientManagement = () => {
       setShowAddModal(false);
       setNewClient({
         firstName: '',
-        lastName: '',
         email: '',
         phone: '',
         country: '',
@@ -373,14 +396,14 @@ const ClientManagement = () => {
     const telUrl = `tel:${phoneNumber}`;
     window.open(telUrl, '_self');
     
-    // Show success message (hide phone number for agents)
-    setTimeout(() => {
-      if (user?.role === 'admin') {
-        alert(`Calling ${client.firstName} ${client.lastName} at ${client.phone}`);
-      } else {
-        alert(`Calling ${client.firstName} ${client.lastName}`);
-      }
-    }, 100);
+         // Show success message (hide phone number for agents)
+     setTimeout(() => {
+       if (user?.role === 'admin') {
+         alert(`Calling ${client.firstName} at ${client.phone}`);
+       } else {
+         alert(`Calling ${client.firstName}`);
+       }
+     }, 100);
   };
 
 
@@ -417,14 +440,14 @@ const ClientManagement = () => {
       window.open(mailtoUrl, '_self');
     }
     
-    // Show success message (hide email for agents)
-    setTimeout(() => {
-      if (user?.role === 'admin') {
-        alert(`${provider} opened for ${client.firstName} ${client.lastName} with pre-filled email`);
-      } else {
-        alert(`${provider} opened for ${client.firstName} ${client.lastName}`);
-      }
-    }, 100);
+         // Show success message (hide email for agents)
+     setTimeout(() => {
+       if (user?.role === 'admin') {
+         alert(`${provider} opened for ${client.firstName} with pre-filled email`);
+       } else {
+         alert(`${provider} opened for ${client.firstName}`);
+       }
+     }, 100);
   };
 
   // Transform analytics data for charts
@@ -525,45 +548,57 @@ const ClientManagement = () => {
         )}
       </div>
 
-      {/* Assignment Bar - Only for Admins */}
-      {isAdmin && (
-        <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 mb-6 p-4 bg-white rounded-lg shadow-sm">
-          <div className="flex items-center space-x-2">
-            <input 
-              type="checkbox" 
-              id="selectAll" 
-              checked={selectAll}
-              onChange={(e) => handleSelectAll(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
-              Select All
-            </label>
-          </div>
-          <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-            <span className="text-sm text-gray-700 font-medium">Assign to:</span>
-            <select 
-              value={assignToAgent}
-              onChange={(e) => setAssignToAgent(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="">Select Agent</option>
-              {availableAgents.map((agent) => (
-                <option key={agent._id} value={agent._id}>
-                  {agent.firstName} {agent.lastName}
-                </option>
-              ))}
-            </select>
-            <button 
-              onClick={handleAssignClients}
-              disabled={selectedClients.size === 0 || !assignToAgent}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-            >
-              Assign ({selectedClients.size})
-            </button>
-          </div>
-        </div>
-      )}
+             {/* Assignment Bar - Only for Admins */}
+       {isAdmin && (
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0 mb-6 p-4 bg-white rounded-lg shadow-sm">
+           <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+             <div className="flex items-center space-x-2">
+               <input 
+                 type="checkbox" 
+                 id="selectAll" 
+                 checked={selectAll}
+                 onChange={(e) => handleSelectAll(e.target.checked)}
+                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+               />
+               <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
+                 Select All
+               </label>
+             </div>
+             <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+               <span className="text-sm text-gray-700 font-medium">Assign to:</span>
+               <select 
+                 value={assignToAgent}
+                 onChange={(e) => setAssignToAgent(e.target.value)}
+                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+               >
+                 <option value="">Select Agent</option>
+                 {availableAgents.map((agent) => (
+                   <option key={agent._id} value={agent._id}>
+                     {agent.firstName} {agent.lastName}
+                   </option>
+                 ))}
+               </select>
+               <button 
+                 onClick={handleAssignClients}
+                 disabled={selectedClients.size === 0 || !assignToAgent}
+                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+               >
+                 Assign ({selectedClients.size})
+               </button>
+             </div>
+           </div>
+           <div className="flex items-center">
+             <button 
+               onClick={handleDeleteClients}
+               disabled={selectedClients.size === 0}
+               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center space-x-2"
+             >
+               <Trash2 className="w-4 h-4" />
+               <span>Delete ({selectedClients.size})</span>
+             </button>
+           </div>
+         </div>
+       )}
 
       {/* Main Client Table */}
       <div className="mb-6">
@@ -616,21 +651,21 @@ const ClientManagement = () => {
                       </td>
                     )}
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900 font-mono">{client.clientId}</td>
-                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                       <div className="flex items-center">
-                         <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-white text-xs lg:text-sm font-medium ${getAvatarColor(client.firstName + client.lastName)}`}>
-                           {getInitials(client.firstName, client.lastName)}
-                         </div>
-                         <div className="ml-2 lg:ml-3">
-                           <button
-                             onClick={() => navigate(`/clients/${client._id}`)}
-                             className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
-                           >
-                             {client.firstName} {client.lastName}
-                           </button>
-                         </div>
-                       </div>
-                     </td>
+                                           <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className={`w-7 h-7 lg:w-8 lg:h-8 rounded-full flex items-center justify-center text-white text-xs lg:text-sm font-medium ${getAvatarColor(client.firstName)}`}>
+                            {getInitials(client.firstName, client.lastName || '')}
+                          </div>
+                          <div className="ml-2 lg:ml-3">
+                            <button
+                              onClick={() => navigate(`/clients/${client._id}`)}
+                              className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
+                            >
+                              {client.firstName}
+                            </button>
+                          </div>
+                        </div>
+                      </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.country}</td>
                                            {user?.role === 'admin' && (
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.phone}</td>
@@ -681,7 +716,7 @@ const ClientManagement = () => {
            <div className="px-4 lg:px-6 py-3 border-t border-gray-200 bg-white">
              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                <div className="text-xs lg:text-sm text-gray-700 text-center sm:text-left">
-                 Showing {((pagination.current - 1) * 5) + 1} to {Math.min(pagination.current * 5, analytics.totalClients)} of {analytics.totalClients} results
+                 Showing {((pagination.current - 1) * 50) + 1} to {Math.min(pagination.current * 50, pagination.total)} of {pagination.total} results
                </div>
                <div className="flex items-center justify-center space-x-1 lg:space-x-2">
                  <button 
@@ -859,25 +894,16 @@ const ClientManagement = () => {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                <input
-                  type="text"
-                  value={newClient.firstName}
-                  onChange={(e) => setNewClient({...newClient, firstName: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                <input
-                  type="text"
-                  value={newClient.lastName}
-                  onChange={(e) => setNewClient({...newClient, lastName: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                         <div className="space-y-4">
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                 <input
+                   type="text"
+                   value={newClient.firstName}
+                   onChange={(e) => setNewClient({...newClient, firstName: e.target.value})}
+                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                 />
+               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
