@@ -239,7 +239,7 @@ const ClientManagement = () => {
     }
 
     const confirmDelete = window.confirm(
-      `Are you sure you want to delete ${selectedClients.size} selected client(s)? This action cannot be undone.`
+      `Are you sure you want to delete ${selectedClients.size} selected client(s)? This action cannot be undone again`
     );
 
     if (!confirmDelete) {
@@ -599,6 +599,7 @@ const ClientManagement = () => {
            </div>
          </div>
        )}
+       A
 
       {/* Main Client Table */}
       <div className="mb-6">
