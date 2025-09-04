@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   // Environment-based API base URL
   BASE_URL: import.meta.env.PROD 
-    ? 'https://crmama.com.mx/api'  // Production API URL
+    ? 'https://crmama.com.mx/api'  // Production API URL (backend)
     : '/api',  // Development uses Vite proxy
   
   // Default headers
