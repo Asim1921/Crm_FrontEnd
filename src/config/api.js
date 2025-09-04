@@ -1,9 +1,7 @@
 // Centralized API configuration
 export const API_CONFIG = {
   // Environment-based API base URL
-  BASE_URL: import.meta.env.PROD 
-    ? 'https://crmama.com.mx/api'  // Production API URL (backend)
-    : '/api',  // Development uses Vite proxy
+  BASE_URL: '/api',  // Use relative URL since both frontend and backend are on same domain
   
   // Default headers
   DEFAULT_HEADERS: {
