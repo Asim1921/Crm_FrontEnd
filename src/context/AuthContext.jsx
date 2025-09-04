@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect } from 'react';
 import sessionManager from '../utils/sessionManager';
+import { getApiUrl, getAuthHeaders } from '../config/api.js';
 
 const AuthContext = createContext();
 
@@ -62,10 +63,8 @@ export const AuthProvider = ({ children }) => {
       if (state.token) {
         try {
           console.log('Loading user with token:', state.token.substring(0, 20) + '...');
-          const response = await fetch('/api/auth/me', {
-            headers: {
-              'Authorization': `Bearer ${state.token}`
-            }
+          const response = await fetch(getApiUrl('/auth/me'), {
+            headers: getAuthHeaders()
           });
           
           if (response.ok) {
@@ -103,11 +102,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(getApiUrl('/auth/login'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ email, password })
       });
 

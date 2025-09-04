@@ -1,18 +1,9 @@
-const API_BASE_URL = '/api';
-
-// Helper function to get auth headers
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` })
-  };
-};
+import { API_CONFIG, getApiUrl, getAuthHeaders } from '../config/api.js';
 
 // Generic API request function
 const apiRequest = async (endpoint, options = {}) => {
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(getApiUrl(endpoint), {
       ...options,
       headers: getAuthHeaders(),
     });
@@ -21,13 +12,23 @@ const apiRequest = async (endpoint, options = {}) => {
     try {
       data = await response.json();
     } catch (parseError) {
-      // Handle non-JSON responses (like rate limit HTML pages)
+      // Handle non-JSON responses (like HTML error pages)
+      console.error('Failed to parse JSON response:', parseError);
+      console.error('Response status:', response.status);
+      console.error('Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      // Try to get response text for debugging
+      const responseText = await response.text();
+      console.error('Response text:', responseText.substring(0, 200) + '...');
+      
       if (response.status === 429) {
         throw new Error('Too many requests. Please wait a moment and try again.');
       } else if (response.status >= 500) {
         throw new Error('Server error. Please try again later.');
+      } else if (response.status === 404) {
+        throw new Error('API endpoint not found. Please check your configuration.');
       } else {
-        throw new Error('Invalid response from server.');
+        throw new Error(`Invalid response from server (${response.status}). Expected JSON but received: ${responseText.substring(0, 50)}...`);
       }
     }
 
