@@ -889,6 +889,7 @@ const Dashboard = () => {
                     selectedClient.status === 'New Lead' ? 'bg-green-100 text-green-800' :
                     selectedClient.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
                     selectedClient.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
+                    selectedClient.status === 'Wrong Number' ? 'bg-red-100 text-red-800' :
                     'bg-red-100 text-red-800'
                   }`}>
                     {selectedClient.status}
@@ -1016,6 +1017,7 @@ const Dashboard = () => {
                   <option value="No Answer">No Answer</option>
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
+                  <option value="Wrong Number">Wrong Number</option>
                 </select>
               </div>
               <div>
@@ -1158,6 +1160,7 @@ const Dashboard = () => {
                   selectedClient.status === 'NA5UP' ? 'bg-teal-100 text-teal-800' :
                   selectedClient.status === 'Not Interested' ? 'bg-gray-100 text-gray-800' :
                   selectedClient.status === 'Hang Up' ? 'bg-purple-100 text-purple-800' :
+                  selectedClient.status === 'Wrong Number' ? 'bg-red-100 text-red-800' :
                   'bg-gray-100 text-gray-800'
                 }`}>
                   {selectedClient.status}
@@ -1178,6 +1181,7 @@ const Dashboard = () => {
                 <option value="NA5UP">NA5UP</option>
                 <option value="Not Interested">Not Interested</option>
                 <option value="Hang Up">Hang Up</option>
+                <option value="Wrong Number">Wrong Number</option>
               </select>
             </div>
             <div className="flex justify-end space-x-3">

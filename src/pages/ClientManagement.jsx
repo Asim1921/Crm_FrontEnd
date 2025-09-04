@@ -96,6 +96,8 @@ const ClientManagement = () => {
         return 'bg-gray-100 text-gray-800';
       case 'Hang Up':
         return 'bg-purple-100 text-purple-800';
+      case 'Wrong Number':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -946,6 +948,7 @@ const ClientManagement = () => {
                   <option value="No Answer">No Answer</option>
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
+                  <option value="Wrong Number">Wrong Number</option>
                 </select>
               </div>
               <div>
