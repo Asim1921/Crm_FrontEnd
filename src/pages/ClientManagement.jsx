@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { clientAPI, reportsAPI } from '../utils/api';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +15,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  X
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -68,6 +69,10 @@ const ClientManagement = () => {
 
   // Countries state
   const [availableCountries, setAvailableCountries] = useState([]);
+
+  // Context menu state for client names
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0, clientId: null });
+  const contextMenuRef = useRef(null);
 
   // Debounce search term
   useEffect(() => {
@@ -190,6 +195,42 @@ const ClientManagement = () => {
     setStatusFilter(status);
     setCurrentPage(1);
   };
+
+  // Handle right-click on client name
+  const handleClientNameContextMenu = (e, clientId) => {
+    e.preventDefault();
+    setContextMenu({
+      show: true,
+      x: e.clientX,
+      y: e.clientY,
+      clientId: clientId
+    });
+  };
+
+  // Handle opening client profile in new tab
+  const handleOpenClientInNewTab = () => {
+    if (contextMenu.clientId) {
+      window.open(`/clients/${contextMenu.clientId}`, '_blank');
+      setContextMenu({ show: false, x: 0, y: 0, clientId: null });
+    }
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+        setContextMenu({ show: false, x: 0, y: 0, clientId: null });
+      }
+    };
+
+    if (contextMenu.show) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [contextMenu.show]);
 
   // Handle select all checkbox
   const handleSelectAll = (checked) => {
@@ -515,8 +556,11 @@ const ClientManagement = () => {
               className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
             >
               <option value="all">All Agents</option>
-              <option value="agent1">Agent 1</option>
-              <option value="agent2">Agent 2</option>
+              {availableAgents.map((agent) => (
+                <option key={agent._id} value={agent._id}>
+                  {agent.firstName} {agent.lastName}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -662,6 +706,7 @@ const ClientManagement = () => {
                           <div className="ml-2 lg:ml-3">
                             <button
                               onClick={() => navigate(`/clients/${client._id}`)}
+                              onContextMenu={(e) => handleClientNameContextMenu(e, client._id)}
                               className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
                             >
                               {client.firstName}
@@ -1027,6 +1072,26 @@ const ClientManagement = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Context Menu for Client Names */}
+      {contextMenu.show && (
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          <button
+            onClick={handleOpenClientInNewTab}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Open in New Tab
+          </button>
         </div>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -8,7 +9,8 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
-  User
+  User,
+  ExternalLink
 } from 'lucide-react';
 import logo from '../logo.png';
 
@@ -16,6 +18,45 @@ const Sidebar = ({ onLogoutClick }) => {
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState({ show: false, x: 0, y: 0 });
+  const contextMenuRef = useRef(null);
+
+  // Handle right-click on Client Management button
+  const handleContextMenu = (e, item) => {
+    if (item.name === 'Client Management') {
+      e.preventDefault();
+      setContextMenu({
+        show: true,
+        x: e.clientX,
+        y: e.clientY
+      });
+    }
+  };
+
+  // Handle opening in new tab
+  const handleOpenInNewTab = () => {
+    window.open('/clients', '_blank');
+    setContextMenu({ show: false, x: 0, y: 0 });
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(event.target)) {
+        setContextMenu({ show: false, x: 0, y: 0 });
+      }
+    };
+
+    if (contextMenu.show) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [contextMenu.show]);
 
   const menuItems = [
     { 
@@ -79,6 +120,7 @@ const Sidebar = ({ onLogoutClick }) => {
               <li key={item.name}>
                 <button
                   onClick={() => navigate(item.path)}
+                  onContextMenu={(e) => handleContextMenu(e, item)}
                   className={`w-full flex items-center px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-colors text-sm lg:text-base ${
                     isActive 
                       ? 'bg-blue-50 text-blue-600 border border-blue-200' 
@@ -109,6 +151,26 @@ const Sidebar = ({ onLogoutClick }) => {
           <span className="font-medium">Logout</span>
         </button>
       </div>
+
+      {/* Context Menu */}
+      {contextMenu.show && (
+        <div
+          ref={contextMenuRef}
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[160px]"
+          style={{
+            left: contextMenu.x,
+            top: contextMenu.y,
+          }}
+        >
+          <button
+            onClick={handleOpenInNewTab}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Open in New Tab
+          </button>
+        </div>
+      )}
     </div>
   );
 };
