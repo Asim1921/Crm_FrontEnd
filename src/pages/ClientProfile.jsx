@@ -14,7 +14,9 @@ import {
   AlertCircle,
   X,
   Edit,
-  Trash2
+  Trash2,
+  Users,
+  Settings
 } from 'lucide-react';
 
 const ClientProfile = () => {
@@ -32,6 +34,7 @@ const ClientProfile = () => {
   // Modal states
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [showBulkCampaignModal, setShowBulkCampaignModal] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [newTask, setNewTask] = useState({
     title: '',
@@ -39,6 +42,12 @@ const ClientProfile = () => {
     priority: 'medium',
     dueDate: ''
   });
+  
+  // Bulk campaign states
+  const [allClients, setAllClients] = useState([]);
+  const [selectedClients, setSelectedClients] = useState(new Set());
+  const [bulkCampaign, setBulkCampaign] = useState('Data');
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Fetch client data
   useEffect(() => {
@@ -195,6 +204,82 @@ const ClientProfile = () => {
     } catch (err) {
       console.error('Error updating campaign:', err);
       alert('Failed to update campaign: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Fetch all clients for bulk campaign update
+  const fetchAllClients = async () => {
+    try {
+      const clientsData = await clientAPI.getClients({ limit: 1000 }); // Get all clients
+      setAllClients(clientsData.clients || []);
+    } catch (err) {
+      console.error('Error fetching clients:', err);
+      alert('Failed to fetch clients: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle bulk campaign update
+  const handleBulkCampaignUpdate = async () => {
+    if (selectedClients.size === 0) {
+      alert('Please select at least one client');
+      return;
+    }
+
+    const confirmUpdate = window.confirm(
+      `Are you sure you want to update ${selectedClients.size} client(s) to campaign "${bulkCampaign}"?`
+    );
+
+    if (!confirmUpdate) {
+      return;
+    }
+
+    setBulkLoading(true);
+    try {
+      // Update campaigns for selected clients
+      const updatePromises = Array.from(selectedClients).map(clientId => 
+        clientAPI.updateClient(clientId, { campaign: bulkCampaign })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      alert(`Successfully updated ${selectedClients.size} client(s) to campaign "${bulkCampaign}"!`);
+      
+      // Close modal and reset state
+      setShowBulkCampaignModal(false);
+      setSelectedClients(new Set());
+      setBulkCampaign('Data');
+      
+      // Refresh current client data if it was updated
+      if (selectedClients.has(id)) {
+        const clientData = await clientAPI.getClientById(id);
+        setClient(clientData);
+      }
+    } catch (err) {
+      console.error('Error updating campaigns:', err);
+      alert('Failed to update campaigns: ' + (err.message || 'Unknown error'));
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  // Handle client selection for bulk update
+  const handleClientSelect = (clientId, checked) => {
+    const newSelectedClients = new Set(selectedClients);
+    if (checked) {
+      newSelectedClients.add(clientId);
+    } else {
+      newSelectedClients.delete(clientId);
+    }
+    setSelectedClients(newSelectedClients);
+  };
+
+  // Handle select all clients
+  const handleSelectAllClients = (checked) => {
+    if (checked) {
+      const allClientIds = new Set(allClients.map(client => client._id));
+      setSelectedClients(allClientIds);
+    } else {
+      setSelectedClients(new Set());
     }
   };
 
@@ -374,18 +459,40 @@ const ClientProfile = () => {
               {/* Campaign Dropdown */}
               <div className="text-center">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Campaign</label>
-                <select
-                  value={client.campaign || 'Data'}
-                  onChange={(e) => handleCampaignChange(e.target.value)}
-                  className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium w-full max-w-xs ${
+                {user?.role === 'admin' ? (
+                  <select
+                    value={client.campaign || 'Data'}
+                    onChange={(e) => handleCampaignChange(e.target.value)}
+                    className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium w-full max-w-xs ${
+                      client.campaign === 'Data' ? 'bg-indigo-100 text-indigo-800' : 
+                      client.campaign === 'Data2' ? 'bg-purple-100 text-purple-800' :
+                      client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
+                      client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
+                      client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
+                      client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                      'bg-gray-100 text-gray-800'
+                    }`}
+                  >
+                    <option value="Data">Data</option>
+                    <option value="Data2">Data2</option>
+                    <option value="Data3">Data3</option>
+                    <option value="Data4">Data4</option>
+                    <option value="Data5">Data5</option>
+                    <option value="Affiliate">Affiliate</option>
+                  </select>
+                ) : (
+                  <div className={`px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium w-full max-w-xs ${
                     client.campaign === 'Data' ? 'bg-indigo-100 text-indigo-800' : 
+                    client.campaign === 'Data2' ? 'bg-purple-100 text-purple-800' :
+                    client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
+                    client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
+                    client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
                     client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
                     'bg-gray-100 text-gray-800'
-                  }`}
-                >
-                  <option value="Data">Data</option>
-                  <option value="Affiliate">Affiliate</option>
-                </select>
+                  }`}>
+                    {client.campaign || 'Data'}
+                  </div>
+                )}
               </div>
               
               <div className="flex items-center justify-center space-x-4">
@@ -406,6 +513,21 @@ const ClientProfile = () => {
                   <Mail className="w-4 h-4" />
                   <span className="text-sm">Email</span>
                 </button>
+
+                {/* Bulk Campaign Update Button - Admin Only */}
+                {user?.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      fetchAllClients();
+                      setShowBulkCampaignModal(true);
+                    }}
+                    className="flex items-center space-x-2 text-gray-600 hover:text-orange-600 transition-colors"
+                    title="Bulk Campaign Update"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span className="text-sm">Bulk Update</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -812,6 +934,141 @@ const ClientProfile = () => {
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
                 Add Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Campaign Update Modal */}
+      {showBulkCampaignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Bulk Campaign Update</h3>
+              <button 
+                onClick={() => {
+                  setShowBulkCampaignModal(false);
+                  setSelectedClients(new Set());
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Campaign Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select Campaign</label>
+                <select
+                  value={bulkCampaign}
+                  onChange={(e) => setBulkCampaign(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm font-medium w-full max-w-xs"
+                >
+                  <option value="Data">Data</option>
+                  <option value="Data2">Data2</option>
+                  <option value="Data3">Data3</option>
+                  <option value="Data4">Data4</option>
+                  <option value="Data5">Data5</option>
+                  <option value="Affiliate">Affiliate</option>
+                </select>
+              </div>
+
+              {/* Client Selection */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="block text-sm font-medium text-gray-700">Select Clients</label>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="selectAllClients"
+                      checked={selectedClients.size === allClients.length && allClients.length > 0}
+                      onChange={(e) => handleSelectAllClients(e.target.checked)}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="selectAllClients" className="text-sm text-gray-700">
+                      Select All ({allClients.length})
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="border border-gray-200 rounded-lg max-h-64 overflow-y-auto">
+                  <div className="p-3 bg-gray-50 border-b border-gray-200">
+                    <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-600">
+                      <div className="col-span-1">Select</div>
+                      <div className="col-span-2">ID</div>
+                      <div className="col-span-3">Name</div>
+                      <div className="col-span-2">Country</div>
+                      <div className="col-span-2">Current Campaign</div>
+                      <div className="col-span-2">Status</div>
+                    </div>
+                  </div>
+                  
+                  {allClients.map((client) => (
+                    <div key={client._id} className="p-3 border-b border-gray-100 hover:bg-gray-50">
+                      <div className="grid grid-cols-12 gap-4 items-center text-sm">
+                        <div className="col-span-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedClients.has(client._id)}
+                            onChange={(e) => handleClientSelect(client._id, e.target.checked)}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="col-span-2 font-mono text-xs">{client.clientId}</div>
+                        <div className="col-span-3 font-medium">{client.firstName}</div>
+                        <div className="col-span-2">{client.country}</div>
+                        <div className="col-span-2">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            client.campaign === 'Data' ? 'bg-indigo-100 text-indigo-800' : 
+                            client.campaign === 'Data2' ? 'bg-purple-100 text-purple-800' :
+                            client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
+                            client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
+                            client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
+                            client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {client.campaign || 'Data'}
+                          </span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className={`px-2 py-1 text-xs rounded-full ${
+                            client.status === 'New Lead' ? 'bg-green-100 text-green-800' :
+                            client.status === 'FTD' ? 'bg-blue-100 text-blue-800' :
+                            client.status === 'Call Again' ? 'bg-orange-100 text-orange-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {client.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="mt-2 text-sm text-gray-600">
+                  Selected: {selectedClients.size} client(s)
+                </div>
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowBulkCampaignModal(false);
+                  setSelectedClients(new Set());
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkCampaignUpdate}
+                disabled={selectedClients.size === 0 || bulkLoading}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulkLoading ? 'Updating...' : `Update ${selectedClients.size} Client(s)`}
               </button>
             </div>
           </div>
