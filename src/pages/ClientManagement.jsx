@@ -18,7 +18,9 @@ import {
   X,
   ExternalLink,
   Users,
-  Settings
+  Settings,
+  Calendar,
+  MessageSquare
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -83,6 +85,12 @@ const ClientManagement = () => {
   const [bulkCampaign, setBulkCampaign] = useState('Data');
   const [bulkCampaignLoading, setBulkCampaignLoading] = useState(false);
 
+  // Date filter states
+  const [showDateFilterModal, setShowDateFilterModal] = useState(false);
+  const [dateFilter, setDateFilter] = useState('');
+  const [dateFilterType, setDateFilterType] = useState('exact'); // exact, range
+  const [endDateFilter, setEndDateFilter] = useState('');
+
   // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -141,7 +149,9 @@ const ClientManagement = () => {
         ...(statusFilter === 'Data' && { campaign: 'Data' }),
         ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
         ...(countryFilter !== 'all' && { country: countryFilter }),
-        ...(agentFilter !== 'all' && { agent: agentFilter })
+        ...(agentFilter !== 'all' && { agent: agentFilter }),
+        ...(dateFilter && { registrationDate: dateFilter }),
+        ...(endDateFilter && { endRegistrationDate: endDateFilter })
       };
       
       const clientsData = await clientAPI.getClients(params);
@@ -167,7 +177,7 @@ const ClientManagement = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter, dateFilter, endDateFilter]);
 
   // Fetch available agents and countries
   useEffect(() => {
@@ -383,6 +393,20 @@ const ClientManagement = () => {
     } else {
       setBulkCampaignSelected(new Set());
     }
+  };
+
+  // Handle date filter
+  const handleDateFilter = () => {
+    setCurrentPage(1);
+    setShowDateFilterModal(false);
+  };
+
+  // Clear date filter
+  const clearDateFilter = () => {
+    setDateFilter('');
+    setEndDateFilter('');
+    setDateFilterType('exact');
+    setCurrentPage(1);
   };
 
   // Handle export clients
@@ -727,6 +751,13 @@ const ClientManagement = () => {
                <span> Campaign Update</span>
              </button>
              <button 
+               onClick={() => setShowDateFilterModal(true)}
+               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-2"
+             >
+               <Calendar className="w-4 h-4" />
+               <span>Date Filter</span>
+             </button>
+             <button 
                onClick={handleDeleteClients}
                disabled={selectedClients.size === 0}
                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center space-x-2"
@@ -773,6 +804,8 @@ const ClientManagement = () => {
                    )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRM ENTRY DATE</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LAST COMMENT</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
                 </tr>
               </thead>
@@ -826,6 +859,12 @@ const ClientManagement = () => {
                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
                          {client.status}
                        </span>
+                     </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
+                       {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'N/A'}
+                     </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900 max-w-xs truncate">
+                       {client.lastComment || client.lastNote || 'No comments'}
                      </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
@@ -1316,6 +1355,98 @@ const ClientManagement = () => {
                 className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {bulkCampaignLoading ? 'Updating...' : `Update ${bulkCampaignSelected.size} Client(s)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Date Filter Modal */}
+      {showDateFilterModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Filter by Registration Date</h3>
+              <button 
+                onClick={() => setShowDateFilterModal(false)} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Filter Type */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filter Type</label>
+                <select
+                  value={dateFilterType}
+                  onChange={(e) => setDateFilterType(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="exact">Exact Date</option>
+                  <option value="range">Date Range</option>
+                </select>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {dateFilterType === 'exact' ? 'Registration Date' : 'Start Date'}
+                </label>
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* End Date (only for range) */}
+              {dateFilterType === 'range' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                  <input
+                    type="date"
+                    value={endDateFilter}
+                    onChange={(e) => setEndDateFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+
+              {/* Current Filter Display */}
+              {(dateFilter || endDateFilter) && (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">
+                    <strong>Current Filter:</strong> 
+                    {dateFilterType === 'exact' 
+                      ? ` Registration date: ${dateFilter}`
+                      : ` Date range: ${dateFilter} to ${endDateFilter || 'present'}`
+                    }
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowDateFilterModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={clearDateFilter}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Clear
+              </button>
+              <button
+                onClick={handleDateFilter}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Apply Filter
               </button>
             </div>
           </div>

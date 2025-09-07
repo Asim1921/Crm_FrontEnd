@@ -21,7 +21,7 @@ import {
   MicOff,
   PhoneOff
 } from 'lucide-react';
-import { communicationAPI, clientAPI, twilioAPI } from '../utils/api';
+import { communicationAPI, clientAPI, twilioAPI, callStatsAPI } from '../utils/api';
 import BrowserCallInterface from '../components/BrowserCallInterface';
 
 
@@ -42,6 +42,13 @@ const CommunicationsHub = () => {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Call statistics state
+  const [callStats, setCallStats] = useState({
+    userStats: null,
+    todayStats: [],
+    loading: false
+  });
   
   // Modal states
   const [showCallModal, setShowCallModal] = useState(false);
@@ -338,6 +345,37 @@ Best regards,
     }
   };
 
+  // Call statistics functions
+  const fetchCallStats = async () => {
+    try {
+      setCallStats(prev => ({ ...prev, loading: true }));
+      
+      const [userStatsResult, todayStatsResult] = await Promise.all([
+        callStatsAPI.getUserCallStats(7),
+        user?.role === 'admin' ? callStatsAPI.getTodayCallStats() : Promise.resolve({ data: { stats: [] } })
+      ]);
+      
+      setCallStats({
+        userStats: userStatsResult.data,
+        todayStats: todayStatsResult.data.stats || [],
+        loading: false
+      });
+    } catch (error) {
+      console.error('Error fetching call stats:', error);
+      setCallStats(prev => ({ ...prev, loading: false }));
+    }
+  };
+
+  const trackCallClick = async () => {
+    try {
+      await callStatsAPI.trackCallClick();
+      // Refresh call stats after tracking
+      fetchCallStats();
+    } catch (error) {
+      console.error('Error tracking call click:', error);
+    }
+  };
+
 
 
 
@@ -368,10 +406,14 @@ Best regards,
     };
 
     fetchData();
+    fetchCallStats();
     initializeTwilio();
   }, []);
 
   const handleCall = async (channel = 'voip') => {
+    // Track call button click
+    await trackCallClick();
+    
     setCallData({ ...callData, channel });
     setShowCallModal(true);
   };
@@ -442,6 +484,9 @@ Best regards,
 
   const makeBrowserCall = async () => {
     try {
+      // Track call button click
+      await trackCallClick();
+      
       // Open browser call with NO pre-filled data
       setSelectedClientForCall(null);
       setShowBrowserCall(true);
@@ -1229,6 +1274,83 @@ Copy this message and paste it in the chat:
                 ))
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Call Statistics Section */}
+        <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
+            <div>
+              <h3 className="text-base lg:text-lg font-semibold text-gray-900">Call Statistics</h3>
+              <p className="text-xs lg:text-sm text-gray-600">Daily call activity per user</p>
+            </div>
+            <button 
+              onClick={fetchCallStats}
+              disabled={callStats.loading}
+              className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 text-sm disabled:opacity-50"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>{callStats.loading ? 'Loading...' : 'Refresh'}</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* User's Personal Stats */}
+            {callStats.userStats && (
+              <div className="bg-blue-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-blue-900 mb-3">Your Call Activity (Last 7 Days)</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{callStats.userStats.summary.totalCalls}</div>
+                    <div className="text-xs text-blue-700">Total Calls</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{callStats.userStats.summary.averagePerDay}</div>
+                    <div className="text-xs text-blue-700">Avg/Day</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{callStats.userStats.summary.days}</div>
+                    <div className="text-xs text-blue-700">Days Tracked</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Today's Stats for All Users (Admin only) */}
+            {user?.role === 'admin' && callStats.todayStats.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-900 mb-3">Today's Call Activity by User</h4>
+                <div className="space-y-3">
+                  {callStats.todayStats.map((stat, index) => (
+                    <div key={index} className="flex items-center justify-between bg-white rounded-lg p-3">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-8 h-8 ${getAvatarColor(stat.userName)} rounded-full flex items-center justify-center`}>
+                          <span className="text-white text-sm font-medium">
+                            {stat.userName.split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{stat.userName}</p>
+                          <p className="text-xs text-gray-600">{stat.userRole}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-gray-900">{stat.callCount}</div>
+                        <div className="text-xs text-gray-600">calls today</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* No data message */}
+            {!callStats.loading && callStats.todayStats.length === 0 && user?.role === 'admin' && (
+              <div className="text-center py-6">
+                <Phone className="w-10 h-10 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-500">No call activity recorded today</p>
+              </div>
+            )}
           </div>
         </div>
 

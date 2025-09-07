@@ -353,6 +353,31 @@ export const twilioAPI = {
   }
 };
 
+// Call Statistics API
+export const callStatsAPI = {
+  // Track call button click
+  trackCallClick: async () => {
+    return apiRequest('/call-stats/track', {
+      method: 'POST'
+    });
+  },
+
+  // Get current user's call statistics
+  getUserCallStats: async (days = 7) => {
+    return apiRequest(`/call-stats/user?days=${days}`);
+  },
+
+  // Get today's call statistics for all users (Admin only)
+  getTodayCallStats: async () => {
+    return apiRequest('/call-stats/today');
+  },
+
+  // Get call statistics for all users (Admin only)
+  getAllCallStats: async (days = 7) => {
+    return apiRequest(`/call-stats/all?days=${days}`);
+  }
+};
+
 // Export default for convenience
 export default {
   auth: authAPI,
@@ -360,5 +385,6 @@ export default {
   tasks: taskAPI,
   reports: reportsAPI,
   users: userAPI,
-  communications: communicationAPI
+  communications: communicationAPI,
+  callStats: callStatsAPI
 };
