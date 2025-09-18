@@ -41,6 +41,8 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [campaignFilter, setCampaignFilter] = useState('all');
+  const [agentFilter, setAgentFilter] = useState('all');
   const [showMenu, setShowMenu] = useState(null);
   
   // Modal states
@@ -84,6 +86,25 @@ const Dashboard = () => {
       if (!isAssignedToUser) return false;
     }
     
+    // Apply status filter
+    if (statusFilter !== 'all' && statusFilter !== client.status) {
+      return false;
+    }
+    
+    // Apply campaign filter
+    if (campaignFilter !== 'all' && campaignFilter !== client.campaign) {
+      return false;
+    }
+    
+    // Apply agent filter
+    if (agentFilter !== 'all') {
+      if (agentFilter === 'unassigned' && client.assignedAgent) {
+        return false;
+      } else if (agentFilter !== 'unassigned' && client.assignedAgent?._id !== agentFilter) {
+        return false;
+      }
+    }
+    
     // Apply search filter
     if (dashboardSearchQuery.trim()) {
       const query = dashboardSearchQuery.toLowerCase();
@@ -98,13 +119,25 @@ const Dashboard = () => {
       if (!matchesSearch) return false;
     }
     
-    // Apply status/campaign filter
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'Data' || statusFilter === 'Affiliate') {
-      return client.campaign === statusFilter;
-    }
-    return client.status === statusFilter;
+    return true;
   });
+
+  // Get unique campaigns from clients
+  const getUniqueCampaigns = () => {
+    const campaigns = [...new Set(recentClients.map(client => client.campaign).filter(Boolean))];
+    return campaigns.sort();
+  };
+
+  // Get unique agents from clients
+  const getUniqueAgents = () => {
+    const agents = recentClients
+      .map(client => client.assignedAgent)
+      .filter(Boolean)
+      .filter((agent, index, self) => 
+        index === self.findIndex(a => a._id === agent._id)
+      );
+    return agents;
+  };
 
   // Debug logging for agent users
   useEffect(() => {
@@ -700,14 +733,54 @@ const Dashboard = () => {
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Lead Status Overview</h3>
-                {statusFilter !== 'all' && (
+                {(statusFilter !== 'all' || campaignFilter !== 'all' || agentFilter !== 'all') && (
                   <button
-                    onClick={() => setStatusFilter('all')}
+                    onClick={() => {
+                      setStatusFilter('all');
+                      setCampaignFilter('all');
+                      setAgentFilter('all');
+                    }}
                     className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                   >
-                    Clear Filter
+                    Clear All Filters
                   </button>
                 )}
+              </div>
+
+              {/* Filter Controls */}
+              <div className="space-y-3 mb-4">
+                {/* Campaign Filter */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Campaign Filter</label>
+                  <select
+                    value={campaignFilter}
+                    onChange={(e) => setCampaignFilter(e.target.value)}
+                    className="w-full text-xs p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Campaigns</option>
+                    {getUniqueCampaigns().map(campaign => (
+                      <option key={campaign} value={campaign}>{campaign}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Agent Filter */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Client Manager</label>
+                  <select
+                    value={agentFilter}
+                    onChange={(e) => setAgentFilter(e.target.value)}
+                    className="w-full text-xs p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">All Agents</option>
+                    <option value="unassigned">Unassigned</option>
+                    {getUniqueAgents().map(agent => (
+                      <option key={agent._id} value={agent._id}>
+                        {agent.firstName} {agent.lastName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="space-y-3">
                 {statusFilter !== 'all' && (
@@ -720,80 +793,82 @@ const Dashboard = () => {
                       <span className="text-sm text-gray-700">Show All</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900">
-                      {stats.leadStatusOverview.reduce((total, status) => total + status.count, 0)}
+                      {filteredClients.length}
                     </span>
                   </div>
                 )}
-                {stats.leadStatusOverview && stats.leadStatusOverview.map((status) => (
-                  <div 
-                    key={status._id} 
-                    className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
-                      statusFilter === status._id 
-                        ? 'bg-blue-50 border border-blue-200' 
-                        : 'hover:bg-gray-50'
-                    }`}
-                    onClick={() => handleLeadStatusClick(status._id)}
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-3 h-3 rounded-full mr-3 ${
-                        status._id === 'New Lead' ? 'bg-green-500' :
-                        status._id === 'FTD' ? 'bg-blue-500' :
-                        status._id === 'FTD RETENTION' ? 'bg-indigo-500' :
-                        status._id === 'Call Again' ? 'bg-orange-500' :
-                        status._id === 'No Answer' ? 'bg-pink-500' :
-                        status._id === 'NA5UP' ? 'bg-teal-500' :
-                        status._id === 'Not Interested' ? 'bg-gray-500' :
-                        status._id === 'Hang Up' ? 'bg-purple-500' :
-                        'bg-gray-400'
-                      }`}></div>
-                      <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
-                        {status._id}
+                {stats.leadStatusOverview && stats.leadStatusOverview.map((status) => {
+                  const filteredCount = filteredClients.filter(client => client.status === status._id).length;
+                  return (
+                    <div 
+                      key={status._id} 
+                      className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                        statusFilter === status._id 
+                          ? 'bg-blue-50 border border-blue-200' 
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleLeadStatusClick(status._id)}
+                    >
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-3 ${
+                          status._id === 'New Lead' ? 'bg-green-500' :
+                          status._id === 'FTD' ? 'bg-blue-500' :
+                          status._id === 'FTD RETENTION' ? 'bg-indigo-500' :
+                          status._id === 'Call Again' ? 'bg-orange-500' :
+                          status._id === 'No Answer' ? 'bg-pink-500' :
+                          status._id === 'NA5UP' ? 'bg-teal-500' :
+                          status._id === 'Not Interested' ? 'bg-gray-500' :
+                          status._id === 'Hang Up' ? 'bg-purple-500' :
+                          'bg-gray-400'
+                        }`}></div>
+                        <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                          {status._id}
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium ${statusFilter === status._id ? 'text-blue-700' : 'text-gray-900'}`}>
+                        {filteredCount}
                       </span>
                     </div>
-                    <span className={`text-sm font-medium ${statusFilter === status._id ? 'text-blue-700' : 'text-gray-900'}`}>
-                      {status.count}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
                 
-                {/* Campaign Options - Data and Affiliate */}
-                <div 
-                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
-                    statusFilter === 'Data' 
-                      ? 'bg-indigo-50 border border-indigo-200' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => handleLeadStatusClick('Data')}
-                >
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-3 bg-indigo-500"></div>
-                    <span className={`text-sm ${statusFilter === 'Data' ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}>
-                      Data
-                    </span>
-                  </div>
-                  <span className={`text-sm font-medium ${statusFilter === 'Data' ? 'text-indigo-700' : 'text-gray-900'}`}>
-                    {recentClients.filter(client => client.campaign === 'Data').length}
-                  </span>
-                </div>
-                
-                <div 
-                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
-                    statusFilter === 'Affiliate' 
-                      ? 'bg-teal-50 border border-teal-200' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => handleLeadStatusClick('Affiliate')}
-                >
-                  <div className="flex items-center">
-                    <div className="w-3 h-3 rounded-full mr-3 bg-teal-500"></div>
-                    <span className={`text-sm ${statusFilter === 'Affiliate' ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>
-                      Affiliate
-                    </span>
-                  </div>
-                  <span className={`text-sm font-medium ${statusFilter === 'Affiliate' ? 'text-teal-700' : 'text-gray-900'}`}>
-                    {recentClients.filter(client => client.campaign === 'Affiliate').length}
-                  </span>
-                </div>
+                {/* Campaign Options - Dynamic based on available campaigns */}
+                {getUniqueCampaigns().map(campaign => {
+                  const filteredCount = filteredClients.filter(client => client.campaign === campaign).length;
+                  const isSelected = statusFilter === campaign;
+                  const campaignColors = {
+                    'Data': 'indigo',
+                    'Affiliate': 'teal',
+                    'Data1': 'blue',
+                    'Data2': 'green',
+                    'Data3': 'yellow',
+                    'Data4': 'red',
+                    'Data5': 'purple'
+                  };
+                  const color = campaignColors[campaign] || 'gray';
+                  
+                  return (
+                    <div 
+                      key={campaign}
+                      className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
+                        isSelected 
+                          ? `bg-${color}-50 border border-${color}-200` 
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => handleLeadStatusClick(campaign)}
+                    >
+                      <div className="flex items-center">
+                        <div className={`w-3 h-3 rounded-full mr-3 bg-${color}-500`}></div>
+                        <span className={`text-sm ${isSelected ? `text-${color}-700 font-medium` : 'text-gray-700'}`}>
+                          {campaign}
+                        </span>
+                      </div>
+                      <span className={`text-sm font-medium ${isSelected ? `text-${color}-700` : 'text-gray-900'}`}>
+                        {filteredCount}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

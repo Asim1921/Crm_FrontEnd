@@ -20,7 +20,11 @@ import {
   Users,
   Settings,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  ChevronLeft,
+  ChevronRight,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -57,6 +61,8 @@ const ClientManagement = () => {
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingClient, setEditingClient] = useState(null);
   const [newClient, setNewClient] = useState({
     firstName: '',
     email: '',
@@ -84,12 +90,20 @@ const ClientManagement = () => {
   const [bulkCampaignSelected, setBulkCampaignSelected] = useState(new Set());
   const [bulkCampaign, setBulkCampaign] = useState('Data');
   const [bulkCampaignLoading, setBulkCampaignLoading] = useState(false);
+  
+  // Bulk campaign date filter states
+  const [bulkCampaignDateFilter, setBulkCampaignDateFilter] = useState('');
+  const [bulkCampaignEndDateFilter, setBulkCampaignEndDateFilter] = useState('');
 
   // Date filter states
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
   const [dateFilter, setDateFilter] = useState('');
   const [dateFilterType, setDateFilterType] = useState('exact'); // exact, range
   const [endDateFilter, setEndDateFilter] = useState('');
+  
+  // Date navigation states
+  const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dateNavigationType, setDateNavigationType] = useState('entry'); // 'entry' or 'comment'
 
   // Debounce search term
   useEffect(() => {
@@ -149,7 +163,8 @@ const ClientManagement = () => {
         ...(statusFilter === 'Data' && { campaign: 'Data' }),
         ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
         ...(countryFilter !== 'all' && { country: countryFilter }),
-        ...(agentFilter !== 'all' && { agent: agentFilter }),
+        // For agents, automatically filter to only their assigned clients
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
         ...(dateFilter && { registrationDate: dateFilter }),
         ...(endDateFilter && { endRegistrationDate: endDateFilter })
       };
@@ -158,13 +173,8 @@ const ClientManagement = () => {
       setClients(clientsData.clients || []);
       setPagination(clientsData.pagination || {});
       
-      // Fetch analytics
-      const analyticsData = await reportsAPI.getAnalytics();
-      setAnalytics({
-        clientsByCountry: analyticsData.clientsByCountry || [],
-        leadStatusOverview: analyticsData.leadStatusDistribution || [],
-        totalClients: clientsData.pagination?.total || 0
-      });
+      // Analytics are now calculated dynamically from filtered clients
+      // No need to fetch static analytics data
       
       setError(null);
     } catch (err) {
@@ -325,12 +335,60 @@ const ClientManagement = () => {
   // Fetch all clients for bulk campaign update
   const fetchBulkCampaignClients = async () => {
     try {
-      const clientsData = await clientAPI.getClients({ limit: 1000 }); // Get all clients
+      const params = {
+        limit: 1000,
+        // For agents, automatically filter to only their assigned clients
+        ...(user?.role === 'agent' ? { agent: user._id } : {}),
+        // Apply date filters if set
+        ...(bulkCampaignDateFilter && { registrationDate: bulkCampaignDateFilter }),
+        ...(bulkCampaignEndDateFilter && { endRegistrationDate: bulkCampaignEndDateFilter })
+      };
+      
+      const clientsData = await clientAPI.getClients(params);
       setBulkCampaignClients(clientsData.clients || []);
     } catch (err) {
       console.error('Error fetching clients:', err);
       alert('Failed to fetch clients: ' + (err.message || 'Unknown error'));
     }
+  };
+
+  // Clear bulk campaign date filters
+  const clearBulkCampaignDateFilters = () => {
+    setBulkCampaignDateFilter('');
+    setBulkCampaignEndDateFilter('');
+  };
+
+  // Date navigation functions
+  const navigateDate = (direction, type) => {
+    const current = new Date(currentDate);
+    let newDate;
+    
+    if (direction === 'prev') {
+      newDate = new Date(current.getTime() - 24 * 60 * 60 * 1000); // Previous day
+    } else {
+      newDate = new Date(current.getTime() + 24 * 60 * 60 * 1000); // Next day
+    }
+    
+    const formattedDate = newDate.toISOString().split('T')[0];
+    setCurrentDate(formattedDate);
+    setDateNavigationType(type);
+    
+    // Apply the date filter
+    if (type === 'entry') {
+      setDateFilter(formattedDate);
+      setDateFilterType('exact');
+    } else if (type === 'comment') {
+      // For comment dates, we'll need to implement a different approach
+      // since comments don't have a direct date field in the current structure
+      setDateFilter(formattedDate);
+      setDateFilterType('exact');
+    }
+  };
+
+  const resetDateNavigation = () => {
+    setCurrentDate(new Date().toISOString().split('T')[0]);
+    setDateFilter('');
+    setEndDateFilter('');
   };
 
   // Handle bulk campaign update
@@ -363,6 +421,7 @@ const ClientManagement = () => {
       setShowBulkCampaignModal(false);
       setBulkCampaignSelected(new Set());
       setBulkCampaign('Data');
+      clearBulkCampaignDateFilters();
       
       // Refresh data
       fetchData();
@@ -531,6 +590,44 @@ const ClientManagement = () => {
     }
   };
 
+  // Handle edit client
+  const handleEditClient = (client) => {
+    setEditingClient({
+      _id: client._id,
+      firstName: client.firstName,
+      email: client.email,
+      phone: client.phone,
+      country: client.country,
+      status: client.status,
+      campaign: client.campaign
+    });
+    setShowEditModal(true);
+  };
+
+  // Handle update client
+  const handleUpdateClient = async () => {
+    try {
+      await clientAPI.updateClient(editingClient._id, {
+        firstName: editingClient.firstName,
+        email: editingClient.email,
+        phone: editingClient.phone,
+        country: editingClient.country,
+        status: editingClient.status,
+        campaign: editingClient.campaign
+      });
+      
+      alert('Client updated successfully!');
+      setShowEditModal(false);
+      setEditingClient(null);
+      
+      // Refresh clients list
+      fetchData();
+    } catch (err) {
+      console.error('Error updating client:', err);
+      alert('Failed to update client: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   // Handle call client
   const handleCall = (client) => {
     if (!client.phone) {
@@ -599,8 +696,44 @@ const ClientManagement = () => {
      }, 100);
   };
 
+  // Calculate dynamic analytics from current clients (which are already filtered by the API)
+  const calculateDynamicAnalytics = () => {
+    // Calculate clients by country from current clients
+    const countryCounts = {};
+    const statusCounts = {};
+    
+    clients.forEach(client => {
+      // Count by country
+      const country = client.country || 'Unknown';
+      countryCounts[country] = (countryCounts[country] || 0) + 1;
+      
+      // Count by status
+      const status = client.status || 'Unknown';
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    
+    // Convert to arrays for charts
+    const clientsByCountry = Object.entries(countryCounts).map(([country, count]) => ({
+      _id: country,
+      count: count
+    }));
+    
+    const leadStatusOverview = Object.entries(statusCounts).map(([status, count]) => ({
+      _id: status,
+      count: count
+    }));
+    
+    return {
+      clientsByCountry,
+      leadStatusOverview,
+      totalClients: clients.length
+    };
+  };
+
+  const dynamicAnalytics = calculateDynamicAnalytics();
+
   // Transform analytics data for charts
-  const pieChartData = analytics.clientsByCountry.map((item, index) => ({
+  const pieChartData = dynamicAnalytics.clientsByCountry.map((item, index) => ({
     name: item._id,
     value: item.count,
     color: ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#FB7185'][index % 6]
@@ -656,22 +789,47 @@ const ClientManagement = () => {
                 </option>
               ))}
             </select>
-            <select 
-              value={agentFilter}
-              onChange={(e) => setAgentFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">All Agents</option>
-              {availableAgents.map((agent) => (
-                <option key={agent._id} value={agent._id}>
-                  {agent.firstName} {agent.lastName}
-                </option>
-              ))}
-            </select>
+            {isAdmin && (
+              <select 
+                value={agentFilter}
+                onChange={(e) => setAgentFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="all">All Agents</option>
+                {availableAgents.map((agent) => (
+                  <option key={agent._id} value={agent._id}>
+                    {agent.firstName} {agent.lastName}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
         {isAdmin && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+            <button 
+              onClick={() => {
+                if (selectedClients.size === 0) {
+                  alert('Please select a client to edit');
+                  return;
+                }
+                if (selectedClients.size > 1) {
+                  alert('Please select only one client to edit');
+                  return;
+                }
+                const clientId = Array.from(selectedClients)[0];
+                const client = clients.find(c => c._id === clientId);
+                if (client) {
+                  handleEditClient(client);
+                }
+              }}
+              disabled={selectedClients.size !== 1}
+              className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              <span className="hidden sm:inline">Edit Client</span>
+              <span className="sm:hidden">Edit</span>
+            </button>
             <button 
               onClick={() => setShowImportModal(true)}
               className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
@@ -768,11 +926,31 @@ const ClientManagement = () => {
            </div>
          </div>
        )}
-       A
 
       {/* Main Client Table */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          {/* Date Navigation Status */}
+          {(dateFilter || dateNavigationType) && (
+            <div className="px-4 lg:px-6 py-3 bg-blue-50 border-b border-blue-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm text-blue-800">
+                    Filtering by {dateNavigationType === 'entry' ? 'CRM Entry Date' : 'Last Comment Date'}: 
+                    <span className="font-medium ml-1">{currentDate}</span>
+                  </span>
+                </div>
+                <button
+                  onClick={resetDateNavigation}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear Date Filter
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead className="bg-gray-50">
@@ -802,10 +980,52 @@ const ClientManagement = () => {
                    {user?.role === 'agent' && (
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
                    )}
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
+                  {isAdmin && (
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
+                  )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CRM ENTRY DATE</th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">LAST COMMENT</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center justify-between">
+                      <span>CRM ENTRY DATE</span>
+                      <div className="flex flex-col ml-2">
+                        <button
+                          onClick={() => navigateDate('prev', 'entry')}
+                          className="hover:bg-gray-100 rounded p-1"
+                          title="Previous day"
+                        >
+                          <ChevronUp className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                        </button>
+                        <button
+                          onClick={() => navigateDate('next', 'entry')}
+                          className="hover:bg-gray-100 rounded p-1"
+                          title="Next day"
+                        >
+                          <ChevronDown className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center justify-between">
+                      <span>LAST COMMENT</span>
+                      <div className="flex flex-col ml-2">
+                        <button
+                          onClick={() => navigateDate('prev', 'comment')}
+                          className="hover:bg-gray-100 rounded p-1"
+                          title="Previous day"
+                        >
+                          <ChevronUp className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                        </button>
+                        <button
+                          onClick={() => navigateDate('next', 'comment')}
+                          className="hover:bg-gray-100 rounded p-1"
+                          title="Next day"
+                        >
+                          <ChevronDown className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                        </button>
+                      </div>
+                    </div>
+                  </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
                 </tr>
               </thead>
@@ -852,9 +1072,20 @@ const ClientManagement = () => {
                       {user?.role === 'agent' && (
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-400">••••••••••</td>
                       )}
-                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
-                       {client.assignedAgent ? `${client.assignedAgent.firstName} ${client.assignedAgent.lastName}` : 'Unassigned'}
-                     </td>
+                     {isAdmin && (
+                       <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
+                         {client.assignedAgent ? (
+                           <div className="flex items-center">
+                             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${getAvatarColor(client.assignedAgent.firstName)}`}>
+                               {getInitials(client.assignedAgent.firstName, client.assignedAgent.lastName)}
+                             </div>
+                             <span className="ml-2">{client.assignedAgent.firstName} {client.assignedAgent.lastName}</span>
+                           </div>
+                         ) : (
+                           <span className="text-gray-400">Unassigned</span>
+                         )}
+                       </td>
+                     )}
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(client.status)}`}>
                          {client.status}
@@ -863,8 +1094,19 @@ const ClientManagement = () => {
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                        {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'N/A'}
                      </td>
-                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900 max-w-xs truncate">
-                       {client.lastComment || client.lastNote || 'No comments'}
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900 max-w-xs">
+                       {client.lastComment ? (
+                         <div className="space-y-1">
+                           <div className="truncate">
+                             {client.lastComment}
+                           </div>
+                           <div className="text-xs text-gray-500">
+                             {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleDateString() : 'No date'}
+                           </div>
+                         </div>
+                       ) : (
+                         <span className="text-gray-400">No comments</span>
+                       )}
                      </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
@@ -895,7 +1137,15 @@ const ClientManagement = () => {
            <div className="px-4 lg:px-6 py-3 border-t border-gray-200 bg-white">
              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
                <div className="text-xs lg:text-sm text-gray-700 text-center sm:text-left">
-                 Showing {((pagination.current - 1) * 50) + 1} to {Math.min(pagination.current * 50, pagination.total)} of {pagination.total} results
+                 {(!pagination.totalClients || pagination.totalClients === 0) ? (
+                   <span>No customers found</span>
+                 ) : pagination.totalClients === 1 ? (
+                   <span>1 customer</span>
+                 ) : (
+                   <span>
+                     {pagination.current} of {pagination.total} pages • {pagination.totalClients} customer{pagination.totalClients !== 1 ? 's' : ''}
+                   </span>
+                 )}
                </div>
                <div className="flex items-center justify-center space-x-1 lg:space-x-2">
                  <button 
@@ -935,34 +1185,57 @@ const ClientManagement = () => {
       </div>
 
              {/* Charts Row - Below the table */}
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-                 {/* Clients by Country */}
-         <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
-           <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Country</h3>
-           <div className="h-48 lg:h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieChartData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+       {isAdmin && (
+         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
+                   {/* Analytics Header */}
+           <div className="lg:col-span-2 mb-2">
+             <div className="flex items-center justify-between">
+               <h2 className="text-lg font-semibold text-gray-900">Analytics Overview</h2>
+               <div className="text-sm text-gray-600">
+                 Showing data for {dynamicAnalytics.totalClients} filtered client{dynamicAnalytics.totalClients !== 1 ? 's' : ''}
+                 {(agentFilter !== 'all' || statusFilter !== 'all' || countryFilter !== 'all' || debouncedSearchTerm) && (
+                   <span className="ml-2 text-blue-600">• Filtered View</span>
+                 )}
+               </div>
+             </div>
+           </div>
+                   
+                   {/* Clients by Country */}
+           <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Country</h3>
+             <div className="h-48 lg:h-64">
+              {pieChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No clients to display</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-                 {/* Lead Status Overview */}
-         <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+                   {/* Lead Status Overview */}
+           <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
            <div className="flex justify-between items-center mb-4">
              <h3 className="text-base lg:text-lg font-semibold text-gray-900">Lead Status Overview</h3>
              {statusFilter !== 'all' && (
@@ -985,11 +1258,11 @@ const ClientManagement = () => {
                    <span className="text-sm text-gray-700">Show All</span>
                  </div>
                  <span className="text-sm font-medium text-gray-900">
-                   {analytics.leadStatusOverview.reduce((total, status) => total + status.count, 0)}
+                   {dynamicAnalytics.leadStatusOverview.reduce((total, status) => total + status.count, 0)}
                  </span>
                </div>
              )}
-             {analytics.leadStatusOverview && analytics.leadStatusOverview.map((status) => (
+             {dynamicAnalytics.leadStatusOverview && dynamicAnalytics.leadStatusOverview.length > 0 ? dynamicAnalytics.leadStatusOverview.map((status) => (
                <div 
                  key={status._id} 
                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
@@ -1019,7 +1292,12 @@ const ClientManagement = () => {
                    {status.count}
                  </span>
                </div>
-             ))}
+             )) : (
+               <div className="text-center py-6">
+                 <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                 <p className="text-sm text-gray-500">No status data to display</p>
+               </div>
+             )}
              
              {/* Campaign Options - Data and Affiliate */}
              <div 
@@ -1062,6 +1340,7 @@ const ClientManagement = () => {
            </div>
          </div>
        </div>
+       )}
 
              {/* Add Client Modal */}
        {showAddModal && (
@@ -1236,6 +1515,7 @@ const ClientManagement = () => {
                 onClick={() => {
                   setShowBulkCampaignModal(false);
                   setBulkCampaignSelected(new Set());
+                  clearBulkCampaignDateFilters();
                 }} 
                 className="text-gray-400 hover:text-gray-600"
               >
@@ -1259,6 +1539,55 @@ const ClientManagement = () => {
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
                 </select>
+              </div>
+
+              {/* Date Filter Section */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Registration Date</label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1">
+                    <input
+                      type="date"
+                      value={bulkCampaignDateFilter}
+                      onChange={(e) => setBulkCampaignDateFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                      placeholder="Start Date"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <input
+                      type="date"
+                      value={bulkCampaignEndDateFilter}
+                      onChange={(e) => setBulkCampaignEndDateFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-full"
+                      placeholder="End Date"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        clearBulkCampaignDateFilters();
+                        fetchBulkCampaignClients();
+                      }}
+                      className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium"
+                    >
+                      Clear
+                    </button>
+                    <button
+                      onClick={fetchBulkCampaignClients}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                    >
+                      Apply Filter
+                    </button>
+                  </div>
+                </div>
+                {(bulkCampaignDateFilter || bulkCampaignEndDateFilter) && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    Filtering by: {bulkCampaignDateFilter && `From ${bulkCampaignDateFilter}`} 
+                    {bulkCampaignDateFilter && bulkCampaignEndDateFilter && ' '} 
+                    {bulkCampaignEndDateFilter && `To ${bulkCampaignEndDateFilter}`}
+                  </div>
+                )}
               </div>
 
               {/* Client Selection */}
@@ -1344,6 +1673,7 @@ const ClientManagement = () => {
                 onClick={() => {
                   setShowBulkCampaignModal(false);
                   setBulkCampaignSelected(new Set());
+                  clearBulkCampaignDateFilters();
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
@@ -1447,6 +1777,106 @@ const ClientManagement = () => {
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
                 Apply Filter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Modal */}
+      {showEditModal && editingClient && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Edit Client</h3>
+              <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={editingClient.firstName}
+                  onChange={(e) => setEditingClient({...editingClient, firstName: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editingClient.email}
+                  onChange={(e) => setEditingClient({...editingClient, email: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <input
+                  type="text"
+                  value={editingClient.phone}
+                  onChange={(e) => setEditingClient({...editingClient, phone: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                <input
+                  type="text"
+                  value={editingClient.country}
+                  onChange={(e) => setEditingClient({...editingClient, country: e.target.value})}
+                  placeholder="Enter country name"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={editingClient.status}
+                  onChange={(e) => setEditingClient({...editingClient, status: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="New Lead">New Lead</option>
+                  <option value="FTD">FTD</option>
+                  <option value="FTD RETENTION">FTD RETENTION</option>
+                  <option value="Call Again">Call Again</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="NA5UP">NA5UP</option>
+                  <option value="Not Interested">Not Interested</option>
+                  <option value="Hang Up">Hang Up</option>
+                  <option value="Wrong Number">Wrong Number</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Campaign</label>
+                <select
+                  value={editingClient.campaign}
+                  onChange={(e) => setEditingClient({...editingClient, campaign: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="Data">Data</option>
+                  <option value="Data2">Data2</option>
+                  <option value="Data3">Data3</option>
+                  <option value="Data4">Data4</option>
+                  <option value="Data5">Data5</option>
+                  <option value="Affiliate">Affiliate</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateClient}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Update Client
               </button>
             </div>
           </div>

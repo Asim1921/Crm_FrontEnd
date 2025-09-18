@@ -16,7 +16,9 @@ import {
   Edit,
   Trash2,
   Users,
-  Settings
+  Settings,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const ClientProfile = () => {
@@ -31,9 +33,14 @@ const ClientProfile = () => {
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('activity');
   
+  // Client navigation state
+  const [navigationClients, setNavigationClients] = useState([]);
+  const [currentClientIndex, setCurrentClientIndex] = useState(-1);
+  
   // Modal states
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [showBulkCampaignModal, setShowBulkCampaignModal] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [newTask, setNewTask] = useState({
@@ -42,12 +49,31 @@ const ClientProfile = () => {
     priority: 'medium',
     dueDate: ''
   });
+  const [editingTask, setEditingTask] = useState(null);
   
   // Bulk campaign states
   const [allClients, setAllClients] = useState([]);
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [bulkCampaign, setBulkCampaign] = useState('Data');
   const [bulkLoading, setBulkLoading] = useState(false);
+
+  // Fetch all clients for navigation
+  useEffect(() => {
+    const fetchAllClientsForNavigation = async () => {
+      try {
+        const clientsData = await clientAPI.getClients({ limit: 1000 });
+        setNavigationClients(clientsData.clients || []);
+        
+        // Find current client index
+        const index = clientsData.clients.findIndex(c => c._id === id);
+        setCurrentClientIndex(index);
+      } catch (err) {
+        console.error('Error fetching clients for navigation:', err);
+      }
+    };
+
+    fetchAllClientsForNavigation();
+  }, [id]);
 
   // Fetch client data
   useEffect(() => {
@@ -74,6 +100,17 @@ const ClientProfile = () => {
       fetchClientData();
     }
   }, [id]);
+
+  // Navigation functions
+  const navigateToClient = (direction) => {
+    if (direction === 'prev' && currentClientIndex > 0) {
+      const prevClient = navigationClients[currentClientIndex - 1];
+      navigate(`/clients/${prevClient._id}`);
+    } else if (direction === 'next' && currentClientIndex < navigationClients.length - 1) {
+      const nextClient = navigationClients[currentClientIndex + 1];
+      navigate(`/clients/${nextClient._id}`);
+    }
+  };
 
   // Handle call client
   const handleCall = () => {
@@ -140,10 +177,15 @@ const ClientProfile = () => {
       return;
     }
 
+    if (!newTask.dueDate) {
+      alert('Please select a due date');
+      return;
+    }
+
     try {
       const taskData = {
         ...newTask,
-        clientId: id,
+        client: id, // Changed from clientId to client as required by the model
         assignedTo: user._id,
         status: 'pending'
       };
@@ -317,6 +359,48 @@ const ClientProfile = () => {
     }
   };
 
+  // Handle edit task
+  const handleEditTask = (task) => {
+    setEditingTask(task);
+    setShowEditTaskModal(true);
+  };
+
+  // Handle update task
+  const handleUpdateTask = async () => {
+    if (!editingTask.title.trim()) {
+      alert('Please enter a task title');
+      return;
+    }
+
+    if (!editingTask.dueDate) {
+      alert('Please select a due date');
+      return;
+    }
+
+    try {
+      const updatedTask = await taskAPI.updateTask(editingTask._id, {
+        title: editingTask.title,
+        description: editingTask.description,
+        priority: editingTask.priority,
+        dueDate: editingTask.dueDate
+      });
+      
+      // Update local state
+      setTasks(prevTasks => 
+        prevTasks.map(task => 
+          task._id === editingTask._id ? updatedTask : task
+        )
+      );
+      
+      setShowEditTaskModal(false);
+      setEditingTask(null);
+      alert('Task updated successfully!');
+    } catch (err) {
+      console.error('Error updating task:', err);
+      alert('Failed to update task: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   const getInitials = (firstName, lastName) => {
     return `${firstName?.charAt(0) || ''}${lastName?.charAt(0) || ''}`.toUpperCase();
   };
@@ -415,6 +499,33 @@ const ClientProfile = () => {
 
   return (
     <div className="p-6">
+      {/* Navigation Arrows */}
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={() => navigateToClient('prev')}
+          disabled={currentClientIndex <= 0}
+          className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+        >
+          <ChevronLeft className="w-5 h-5" />
+          <span>Previous Client</span>
+        </button>
+        
+        <div className="text-center">
+          <span className="text-sm text-gray-600">
+            Client {currentClientIndex + 1} of {navigationClients.length}
+          </span>
+        </div>
+        
+        <button
+          onClick={() => navigateToClient('next')}
+          disabled={currentClientIndex >= navigationClients.length - 1}
+          className="flex items-center space-x-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+        >
+          <span>Next Client</span>
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-1 space-y-6">
@@ -704,15 +815,11 @@ const ClientProfile = () => {
                                   type="checkbox"
                                   checked={task.status === 'completed'}
                                   onChange={() => handleTaskStatusUpdate(task._id, task.status === 'completed' ? 'pending' : 'completed')}
-                                  className={`w-4 h-4 text-blue-600 rounded focus:ring-blue-500 ${user?.role === 'admin' ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
-                                  disabled={user?.role !== 'admin'}
+                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
                                 />
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-2">
                                     <p className="font-medium text-gray-900">{task.title}</p>
-                                    {user?.role !== 'admin' && (
-                                      <span className="text-xs text-gray-400 italic">(Read-only)</span>
-                                    )}
                                   </div>
                                   {task.description && (
                                     <p className="text-sm text-gray-600 mt-1">{task.description}</p>
@@ -732,19 +839,27 @@ const ClientProfile = () => {
                                   </div>
                                 </div>
                               </div>
-                              {user?.role === 'admin' && (
+                              {/* Allow both agents and admins to edit and delete tasks */}
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleEditTask(task)}
+                                  className="text-blue-500 hover:text-blue-700 text-sm"
+                                  title="Edit Task"
+                                >
+                                  <Edit className="w-4 h-4" />
+                                </button>
                                 <button
                                   onClick={() => {
                                     if (confirm('Are you sure you want to delete this task?')) {
                                       handleTaskDelete(task._id);
                                     }
                                   }}
-                                  className="text-red-500 hover:text-red-700 text-sm ml-2"
+                                  className="text-red-500 hover:text-red-700 text-sm"
                                   title="Delete Task"
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
+                              </div>
                             </div>
                           </div>
                         ))
@@ -934,6 +1049,82 @@ const ClientProfile = () => {
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
               >
                 Add Task
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {showEditTaskModal && editingTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Edit Task</h3>
+              <button onClick={() => setShowEditTaskModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Task Title *</label>
+                <input
+                  type="text"
+                  value={editingTask.title}
+                  onChange={(e) => setEditingTask({...editingTask, title: e.target.value})}
+                  placeholder="Enter task title"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <textarea
+                  value={editingTask.description || ''}
+                  onChange={(e) => setEditingTask({...editingTask, description: e.target.value})}
+                  placeholder="Enter task description"
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                  rows={3}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <select
+                  value={editingTask.priority}
+                  onChange={(e) => setEditingTask({...editingTask, priority: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
+                <input
+                  type="date"
+                  value={editingTask.dueDate ? new Date(editingTask.dueDate).toISOString().split('T')[0] : ''}
+                  onChange={(e) => setEditingTask({...editingTask, dueDate: e.target.value})}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowEditTaskModal(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateTask}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Update Task
               </button>
             </div>
           </div>

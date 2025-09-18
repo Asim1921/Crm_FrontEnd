@@ -324,32 +324,58 @@ export const communicationAPI = {
   }
 };
 
-// Twilio API calls
+// CLICK2CALL API calls
 export const twilioAPI = {
-  makeCall: async (callData) => {
-    return apiRequest('/twilio/call', {
-      method: 'POST',
-      body: JSON.stringify(callData)
-    });
+  // Initialize Twilio
+  initialize: async () => {
+    try {
+      const response = await apiRequest('/twilio/initialize', {
+        method: 'POST'
+      });
+      return response;
+    } catch (error) {
+      console.error('Twilio initialization error:', error);
+      return { success: false, error: error.message };
+    }
   },
 
-  endCall: async (callSid) => {
-    return apiRequest('/twilio/end-call', {
-      method: 'POST',
-      body: JSON.stringify({ callSid })
-    });
-  },
-
-  getCallStatus: async (callSid) => {
-    return apiRequest(`/twilio/call-status/${callSid}`);
-  },
-
-  getRecentCalls: async (limit = 10) => {
-    return apiRequest(`/twilio/recent-calls?limit=${limit}`);
-  },
-
+  // Get account info
   getAccountInfo: async () => {
-    return apiRequest('/twilio/account-info');
+    try {
+      const response = await apiRequest('/twilio/account-info');
+      return response;
+    } catch (error) {
+      console.error('Twilio account info error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Make a call
+  makeCall: async (callData) => {
+    try {
+      const response = await apiRequest('/twilio/call', {
+        method: 'POST',
+        body: JSON.stringify(callData)
+      });
+      return response;
+    } catch (error) {
+      console.error('Twilio call error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // End a call
+  endCall: async (callSid) => {
+    try {
+      const response = await apiRequest('/twilio/end-call', {
+        method: 'POST',
+        body: JSON.stringify({ callSid })
+      });
+      return response;
+    } catch (error) {
+      console.error('Twilio end call error:', error);
+      return { success: false, error: error.message };
+    }
   }
 };
 
@@ -386,5 +412,6 @@ export default {
   reports: reportsAPI,
   users: userAPI,
   communications: communicationAPI,
-  callStats: callStatsAPI
+  callStats: callStatsAPI,
+  twilio: twilioAPI
 };
