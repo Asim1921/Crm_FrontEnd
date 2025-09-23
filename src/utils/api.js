@@ -129,7 +129,7 @@ export const clientAPI = {
   },
 
   exportClients: async (format = 'csv', clientIds = null) => {
-    let url = '/api/clients/export?format=' + format;
+    let url = getApiUrl('/clients/export?format=' + format);
     if (clientIds && clientIds.length > 0) {
       url += '&clientIds=' + clientIds.join(',');
     }
