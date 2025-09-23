@@ -18,6 +18,7 @@ import {
   X,
   ExternalLink,
   Users,
+  User,
   Settings,
   Calendar,
   MessageSquare,
@@ -42,6 +43,7 @@ const ClientManagement = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
   const [agentFilter, setAgentFilter] = useState('all');
+  const [unassignedFilter, setUnassignedFilter] = useState(false);
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [assignToAgent, setAssignToAgent] = useState('');
@@ -55,6 +57,11 @@ const ClientManagement = () => {
   const [analytics, setAnalytics] = useState({
     clientsByCountry: [],
     leadStatusOverview: [],
+    totalClients: 0
+  });
+  const [globalAnalytics, setGlobalAnalytics] = useState({
+    leadStatusOverview: [],
+    campaignOverview: [],
     totalClients: 0
   });
 
@@ -149,6 +156,32 @@ const ClientManagement = () => {
     return colors[index];
   };
 
+  // Fetch global analytics (for lead status overview)
+  const fetchGlobalAnalytics = async () => {
+    try {
+      const params = {
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
+        ...(statusFilter === 'Data' && { campaign: 'Data' }),
+        ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
+        ...(countryFilter !== 'all' && { country: countryFilter }),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        // Date filtering based on type
+        ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
+        ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
+        ...(dateNavigationType === 'comment' && dateFilter && { commentDate: dateFilter }),
+        ...(dateNavigationType === 'comment' && endDateFilter && { endCommentDate: endDateFilter }),
+        ...(dateFilter && { dateFilterType: dateNavigationType }),
+        ...(unassignedFilter && { unassigned: true })
+      };
+
+      const globalAnalyticsData = await reportsAPI.getLeadStatusOverview(params);
+      setGlobalAnalytics(globalAnalyticsData);
+    } catch (err) {
+      console.error('Error fetching global analytics:', err);
+    }
+  };
+
   // Fetch clients and analytics data
   const fetchData = async () => {
     try {
@@ -165,9 +198,23 @@ const ClientManagement = () => {
         ...(countryFilter !== 'all' && { country: countryFilter }),
         // For agents, automatically filter to only their assigned clients
         ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
-        ...(dateFilter && { registrationDate: dateFilter }),
-        ...(endDateFilter && { endRegistrationDate: endDateFilter })
+        // Unassigned filter
+        ...(unassignedFilter && { unassigned: true }),
+        // Date filtering based on type
+        ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
+        ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
+        ...(dateNavigationType === 'comment' && dateFilter && { commentDate: dateFilter }),
+        ...(dateNavigationType === 'comment' && endDateFilter && { endCommentDate: endDateFilter }),
+        ...(dateFilter && { dateFilterType: dateNavigationType })
       };
+      
+      // Debug logging for date filtering
+      console.log('Frontend date filter params:', {
+        dateNavigationType,
+        dateFilter,
+        endDateFilter,
+        params
+      });
       
       const clientsData = await clientAPI.getClients(params);
       setClients(clientsData.clients || []);
@@ -187,7 +234,12 @@ const ClientManagement = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter, dateFilter, endDateFilter]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType]);
+
+  // Fetch global analytics whenever filters change (but not pagination)
+  useEffect(() => {
+    fetchGlobalAnalytics();
+  }, [debouncedSearchTerm, statusFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType]);
 
   // Fetch available agents and countries
   useEffect(() => {
@@ -339,9 +391,10 @@ const ClientManagement = () => {
         limit: 1000,
         // For agents, automatically filter to only their assigned clients
         ...(user?.role === 'agent' ? { agent: user._id } : {}),
-        // Apply date filters if set
+        // Apply date filters if set (bulk campaign always uses entry date filtering)
         ...(bulkCampaignDateFilter && { registrationDate: bulkCampaignDateFilter }),
-        ...(bulkCampaignEndDateFilter && { endRegistrationDate: bulkCampaignEndDateFilter })
+        ...(bulkCampaignEndDateFilter && { endRegistrationDate: bulkCampaignEndDateFilter }),
+        ...(bulkCampaignDateFilter && { dateFilterType: 'entry' })
       };
       
       const clientsData = await clientAPI.getClients(params);
@@ -457,7 +510,14 @@ const ClientManagement = () => {
   // Handle export clients
   const handleExportClients = async () => {
     try {
-      await clientAPI.exportClients('csv');
+      if (selectedClients.size === 0) {
+        alert('Please select at least one client to export');
+        return;
+      }
+      
+      const clientIds = Array.from(selectedClients);
+      await clientAPI.exportClients('csv', clientIds);
+      alert(`Successfully exported ${clientIds.length} client(s)`);
     } catch (err) {
       console.error('Error exporting clients:', err);
       alert('Failed to export clients: ' + (err.message || 'Unknown error'));
@@ -778,8 +838,17 @@ const ClientManagement = () => {
             {isAdmin && (
               <select 
                 value={agentFilter}
-                onChange={(e) => setAgentFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                onChange={(e) => {
+                  setAgentFilter(e.target.value);
+                  // Reset unassigned filter when agent filter is changed
+                  if (e.target.value !== 'all') {
+                    setUnassignedFilter(false);
+                  }
+                }}
+                disabled={unassignedFilter}
+                className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
+                  unassignedFilter ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
               >
                 <option value="all">All Agents</option>
                 {availableAgents.map((agent) => (
@@ -826,11 +895,20 @@ const ClientManagement = () => {
             </button>
             <button 
               onClick={handleExportClients}
-              className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              disabled={selectedClients.size === 0}
+              className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm transition-colors ${
+                selectedClients.size === 0
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
             >
               <Download className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Export Excel</span>
-              <span className="sm:hidden">Export</span>
+              <span className="hidden sm:inline">
+                Export Excel {selectedClients.size > 0 && `(${selectedClients.size})`}
+              </span>
+              <span className="sm:hidden">
+                Export {selectedClients.size > 0 && `(${selectedClients.size})`}
+              </span>
             </button>
             <button 
               onClick={() => setShowAddModal(true)}
@@ -893,6 +971,24 @@ const ClientManagement = () => {
              >
                <Users className="w-4 h-4" />
                <span> Campaign Update</span>
+             </button>
+             <button 
+               onClick={() => {
+                 setUnassignedFilter(!unassignedFilter);
+                 // Reset agent filter when unassigned filter is activated
+                 if (!unassignedFilter) {
+                   setAgentFilter('all');
+                 }
+                 setCurrentPage(1); // Reset to first page when filter changes
+               }}
+               className={`px-4 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-2 transition-colors ${
+                 unassignedFilter 
+                   ? 'bg-red-600 hover:bg-red-700' 
+                   : 'bg-gray-600 hover:bg-gray-700'
+               }`}
+             >
+               <User className="w-4 h-4" />
+               <span>Unassigned Only</span>
              </button>
              <button 
                onClick={() => setShowDateFilterModal(true)}
@@ -1223,11 +1319,11 @@ const ClientManagement = () => {
                    <span className="text-sm text-gray-700">Show All</span>
                  </div>
                  <span className="text-sm font-medium text-gray-900">
-                   {dynamicAnalytics.leadStatusOverview.reduce((total, status) => total + status.count, 0)}
+                   {globalAnalytics.totalClients}
                  </span>
                </div>
              )}
-             {dynamicAnalytics.leadStatusOverview && dynamicAnalytics.leadStatusOverview.length > 0 ? dynamicAnalytics.leadStatusOverview.map((status) => (
+             {globalAnalytics.leadStatusOverview && globalAnalytics.leadStatusOverview.length > 0 ? globalAnalytics.leadStatusOverview.map((status) => (
                <div 
                  key={status._id} 
                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
@@ -1280,7 +1376,7 @@ const ClientManagement = () => {
                  </span>
                </div>
                <span className={`text-sm font-medium ${statusFilter === 'Data' ? 'text-indigo-700' : 'text-gray-900'}`}>
-                 {clients.filter(client => client.campaign === 'Data').length}
+                 {globalAnalytics.campaignOverview?.find(c => c._id === 'Data')?.count || 0}
                </span>
              </div>
              
@@ -1299,7 +1395,7 @@ const ClientManagement = () => {
                  </span>
                </div>
                <span className={`text-sm font-medium ${statusFilter === 'Affiliate' ? 'text-teal-700' : 'text-gray-900'}`}>
-                 {clients.filter(client => client.campaign === 'Affiliate').length}
+                 {globalAnalytics.campaignOverview?.find(c => c._id === 'Affiliate')?.count || 0}
                </span>
              </div>
            </div>

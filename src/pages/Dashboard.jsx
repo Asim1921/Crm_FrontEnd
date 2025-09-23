@@ -35,7 +35,8 @@ const Dashboard = () => {
     totalClients: { value: 0, change: '0%' },
     activeAgents: { value: 0, change: '0' },
     pendingTasks: { value: 0, overdue: 0 },
-    ftdThisMonth: { value: 0, change: '0%' }
+    ftdThisMonth: { value: 0, change: '0%' },
+    ftdRetention: { value: 0, change: 'Retention clients' }
   });
   const [recentClients, setRecentClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -221,6 +222,7 @@ const Dashboard = () => {
   // Handle export action
   const handleExport = async () => {
     try {
+      // Export all clients (no specific selection in dashboard)
       await clientAPI.exportClients('csv');
       alert('Export completed successfully!');
     } catch (error) {
@@ -408,7 +410,7 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="p-4 lg:p-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 lg:gap-6 mb-6 lg:mb-8">
           <div 
             className="bg-white rounded-xl p-4 lg:p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleStatusCardClick('all')}
@@ -465,6 +467,26 @@ const Dashboard = () => {
               </div>
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-5 h-5 lg:w-6 lg:h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          <div 
+            className="bg-white rounded-xl p-4 lg:p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleStatusCardClick('FTD RETENTION')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs lg:text-sm font-medium text-gray-600">FTD Retention</p>
+                <p className="text-xl lg:text-2xl font-bold text-gray-900">{stats.ftdRetention.value}</p>
+                {user?.role === 'admin' && (
+                  <p className="text-xs text-indigo-600">
+                    {stats.ftdRetention.change}
+                  </p>
+                )}
+              </div>
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 lg:w-6 lg:h-6 text-indigo-600" />
               </div>
             </div>
           </div>

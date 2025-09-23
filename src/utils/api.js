@@ -128,8 +128,13 @@ export const clientAPI = {
     });
   },
 
-  exportClients: async (format = 'csv') => {
-    const response = await fetch('/api/clients/export?format=' + format, {
+  exportClients: async (format = 'csv', clientIds = null) => {
+    let url = '/api/clients/export?format=' + format;
+    if (clientIds && clientIds.length > 0) {
+      url += '&clientIds=' + clientIds.join(',');
+    }
+    
+    const response = await fetch(url, {
       headers: getAuthHeaders(),
     });
     
@@ -220,6 +225,11 @@ export const reportsAPI = {
   getAnalytics: async (params = {}) => {
     const queryString = new URLSearchParams(params).toString();
     return apiRequest(`/reports/analytics${queryString ? `?${queryString}` : ''}`);
+  },
+
+  getLeadStatusOverview: async (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return apiRequest(`/reports/lead-status-overview${queryString ? `?${queryString}` : ''}`);
   },
 
   getUserStats: async () => {

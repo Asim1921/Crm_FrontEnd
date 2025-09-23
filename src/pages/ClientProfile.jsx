@@ -85,10 +85,13 @@ const ClientProfile = () => {
         
         // Fetch all tasks for this client (not just user's tasks)
         const tasksData = await taskAPI.getTasks({ clientId: id });
-        setTasks(tasksData.tasks || []);
+        // Sort tasks by creation date (newest first)
+        const sortedTasks = (tasksData.tasks || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setTasks(sortedTasks);
         
-        // Set notes from client data
-        setNotes(clientData.notes || []);
+        // Set notes from client data, sorted by creation date (newest first)
+        const sortedNotes = (clientData.notes || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setNotes(sortedNotes);
       } catch (err) {
         setError(err.message || 'Failed to load client data');
       } finally {
@@ -160,7 +163,9 @@ const ClientProfile = () => {
     try {
       const updatedClient = await clientAPI.addNote(id, newNote);
       setClient(updatedClient);
-      setNotes(updatedClient.notes || []);
+      // Sort notes by creation date (newest first)
+      const sortedNotes = (updatedClient.notes || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setNotes(sortedNotes);
       setNewNote('');
       setShowAddNoteModal(false);
       
@@ -191,7 +196,7 @@ const ClientProfile = () => {
       };
       
       const createdTask = await taskAPI.createTask(taskData);
-      setTasks([...tasks, createdTask]);
+      setTasks([createdTask, ...tasks]);
       setNewTask({
         title: '',
         description: '',
@@ -744,7 +749,9 @@ const ClientProfile = () => {
                       {notes.length === 0 ? (
                         <p className="text-gray-500 text-center py-4">No notes yet. Add your first note!</p>
                       ) : (
-                        notes.map((note, index) => (
+                        notes
+                          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                          .map((note, index) => (
                           <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
                             <div className="flex items-start space-x-3">
                               <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
@@ -769,7 +776,9 @@ const ClientProfile = () => {
                                              await clientAPI.deleteNote(id, note._id);
                                              const updatedClient = await clientAPI.getClientById(id);
                                              setClient(updatedClient);
-                                             setNotes(updatedClient.notes || []);
+                                             // Sort notes by creation date (newest first)
+                                             const sortedNotes = (updatedClient.notes || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                                             setNotes(sortedNotes);
                                              alert('Note deleted successfully!');
                                            } catch (err) {
                                              alert('Failed to delete note: ' + err.message);
@@ -807,7 +816,9 @@ const ClientProfile = () => {
                       {tasks.length === 0 ? (
                         <p className="text-gray-500 text-center py-4">No tasks yet. Add your first task!</p>
                       ) : (
-                        tasks.map((task) => (
+                        tasks
+                          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                          .map((task) => (
                           <div key={task._id} className="bg-white rounded-lg p-3 border border-gray-200">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
