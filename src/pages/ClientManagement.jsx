@@ -358,37 +358,19 @@ const ClientManagement = () => {
     setBulkCampaignEndDateFilter('');
   };
 
-  // Date navigation functions
+  // Date navigation functions - now opens date filter modal instead of auto-applying
   const navigateDate = (direction, type) => {
-    const current = new Date(currentDate);
-    let newDate;
-    
-    if (direction === 'prev') {
-      newDate = new Date(current.getTime() - 24 * 60 * 60 * 1000); // Previous day
-    } else {
-      newDate = new Date(current.getTime() + 24 * 60 * 60 * 1000); // Next day
-    }
-    
-    const formattedDate = newDate.toISOString().split('T')[0];
-    setCurrentDate(formattedDate);
+    // Set the navigation type and open the date filter modal
     setDateNavigationType(type);
-    
-    // Apply the date filter
-    if (type === 'entry') {
-      setDateFilter(formattedDate);
-      setDateFilterType('exact');
-    } else if (type === 'comment') {
-      // For comment dates, we'll need to implement a different approach
-      // since comments don't have a direct date field in the current structure
-      setDateFilter(formattedDate);
-      setDateFilterType('exact');
-    }
+    setShowDateFilterModal(true);
   };
 
   const resetDateNavigation = () => {
     setCurrentDate(new Date().toISOString().split('T')[0]);
     setDateFilter('');
     setEndDateFilter('');
+    setDateNavigationType('entry');
+    setDateFilterType('exact');
   };
 
   // Handle bulk campaign update
@@ -456,6 +438,10 @@ const ClientManagement = () => {
 
   // Handle date filter
   const handleDateFilter = () => {
+    if (!dateFilter) {
+      alert('Please select a date first');
+      return;
+    }
     setCurrentPage(1);
     setShowDateFilterModal(false);
   };
@@ -910,9 +896,9 @@ const ClientManagement = () => {
              </button>
              <button 
                onClick={() => setShowDateFilterModal(true)}
-               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-2"
+               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-2 border-2 border-green-500 hover:border-green-400"
              >
-               <Calendar className="w-4 h-4" />
+               <Calendar className="w-5 h-5" />
                <span>Date Filter</span>
              </button>
              <button 
@@ -930,26 +916,6 @@ const ClientManagement = () => {
       {/* Main Client Table */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Date Navigation Status */}
-          {(dateFilter || dateNavigationType) && (
-            <div className="px-4 lg:px-6 py-3 bg-blue-50 border-b border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Calendar className="w-4 h-4 text-blue-600" />
-                  <span className="text-sm text-blue-800">
-                    Filtering by {dateNavigationType === 'entry' ? 'CRM Entry Date' : 'Last Comment Date'}: 
-                    <span className="font-medium ml-1">{currentDate}</span>
-                  </span>
-                </div>
-                <button
-                  onClick={resetDateNavigation}
-                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  Clear Date Filter
-                </button>
-              </div>
-            </div>
-          )}
           
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
@@ -1185,8 +1151,7 @@ const ClientManagement = () => {
       </div>
 
              {/* Charts Row - Below the table */}
-       {isAdmin && (
-         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
                    {/* Analytics Header */}
            <div className="lg:col-span-2 mb-2">
              <div className="flex items-center justify-between">
@@ -1340,7 +1305,6 @@ const ClientManagement = () => {
            </div>
          </div>
        </div>
-       )}
 
              {/* Add Client Modal */}
        {showAddModal && (
@@ -1696,7 +1660,9 @@ const ClientManagement = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Filter by Registration Date</h3>
+              <h3 className="text-lg font-semibold">
+                Filter by {dateNavigationType === 'entry' ? 'CRM Entry Date' : 'Last Comment Date'}
+              </h3>
               <button 
                 onClick={() => setShowDateFilterModal(false)} 
                 className="text-gray-400 hover:text-gray-600"
@@ -1706,6 +1672,14 @@ const ClientManagement = () => {
             </div>
             
             <div className="space-y-4">
+              {/* Instructions */}
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Instructions:</strong> Choose how you want to filter the records by {dateNavigationType === 'entry' ? 'CRM entry date' : 'last comment date'}.
+                  You can select a single date or a range of dates using the calendar inputs below.
+                </p>
+              </div>
+
               {/* Filter Type */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Filter Type</label>
@@ -1714,22 +1688,37 @@ const ClientManagement = () => {
                   onChange={(e) => setDateFilterType(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="exact">Exact Date</option>
+                  <option value="exact">Single Date</option>
                   <option value="range">Date Range</option>
                 </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {dateFilterType === 'exact' 
+                    ? 'Show records from a specific date only' 
+                    : 'Show records within a date range'
+                  }
+                </p>
               </div>
 
               {/* Start Date */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {dateFilterType === 'exact' ? 'Registration Date' : 'Start Date'}
+                  {dateFilterType === 'exact' 
+                    ? `${dateNavigationType === 'entry' ? 'CRM Entry' : 'Last Comment'} Date` 
+                    : 'Start Date'
+                  }
                 </label>
                 <input
                   type="date"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Select date"
                 />
+                {dateFilterType === 'exact' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select the exact date to filter records
+                  </p>
+                )}
               </div>
 
               {/* End Date (only for range) */}
@@ -1741,7 +1730,11 @@ const ClientManagement = () => {
                     value={endDateFilter}
                     onChange={(e) => setEndDateFilter(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    min={dateFilter} // Ensure end date is not before start date
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select the end date for the range (optional - leave empty for open-ended range)
+                  </p>
                 </div>
               )}
 
@@ -1749,9 +1742,9 @@ const ClientManagement = () => {
               {(dateFilter || endDateFilter) && (
                 <div className="p-3 bg-gray-50 rounded-lg">
                   <p className="text-sm text-gray-600">
-                    <strong>Current Filter:</strong> 
+                    <strong>Current Selection:</strong> 
                     {dateFilterType === 'exact' 
-                      ? ` Registration date: ${dateFilter}`
+                      ? ` ${dateNavigationType === 'entry' ? 'CRM Entry' : 'Last Comment'} date: ${dateFilter}`
                       : ` Date range: ${dateFilter} to ${endDateFilter || 'present'}`
                     }
                   </p>
@@ -1770,11 +1763,12 @@ const ClientManagement = () => {
                 onClick={clearDateFilter}
                 className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
               >
-                Clear
+                Clear All
               </button>
               <button
                 onClick={handleDateFilter}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                disabled={!dateFilter}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Apply Filter
               </button>

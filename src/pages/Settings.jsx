@@ -537,7 +537,7 @@ const Settings = () => {
                                 {userItem.firstName} {userItem.lastName}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {userItem.phone || 'No phone'}
+                                {userItem.phone || 'No extension'}
                               </div>
                             </div>
                           </div>
@@ -736,7 +736,7 @@ const Settings = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (Optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Extension (Optional)</label>
                 <input
                   type="tel"
                   value={createUserForm.phone}
@@ -864,7 +864,7 @@ const Settings = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone (Optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Extension (Optional)</label>
                 <input
                   type="tel"
                   value={editUserForm.phone}
