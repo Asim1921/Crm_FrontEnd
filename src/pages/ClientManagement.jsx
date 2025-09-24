@@ -25,7 +25,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Copy
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -46,7 +47,10 @@ const ClientManagement = () => {
   const [unassignedFilter, setUnassignedFilter] = useState(false);
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [showStatusFilter, setShowStatusFilter] = useState(false);
+  const [duplicateFilter, setDuplicateFilter] = useState(false);
   const [assignToAgent, setAssignToAgent] = useState('');
+  const statusFilterRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -175,7 +179,9 @@ const ClientManagement = () => {
         ...(unassignedFilter && { unassigned: true })
       };
 
+      console.log('Frontend - Sending params to getLeadStatusOverview:', params);
       const globalAnalyticsData = await reportsAPI.getLeadStatusOverview(params);
+      console.log('Frontend - Received globalAnalyticsData:', globalAnalyticsData);
       setGlobalAnalytics(globalAnalyticsData);
     } catch (err) {
       console.error('Error fetching global analytics:', err);
@@ -187,10 +193,10 @@ const ClientManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch clients with 50 records per page
+      // For duplicate filter, we need to fetch all clients to find duplicates
       const params = {
-        page: currentPage,
-        limit: 50, // Changed from 5 to 50
+        page: duplicateFilter ? 1 : currentPage,
+        limit: duplicateFilter ? 1000 : 50, // Fetch all clients for duplicate detection
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
         ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
         ...(statusFilter === 'Data' && { campaign: 'Data' }),
@@ -217,7 +223,15 @@ const ClientManagement = () => {
       });
       
       const clientsData = await clientAPI.getClients(params);
-      setClients(clientsData.clients || []);
+      let filteredClients = clientsData.clients || [];
+      
+      // If duplicate filter is active, filter to show only duplicates
+      if (duplicateFilter) {
+        const duplicateIds = findDuplicateClients(filteredClients);
+        filteredClients = filteredClients.filter(client => duplicateIds.includes(client._id));
+      }
+      
+      setClients(filteredClients);
       setPagination(clientsData.pagination || {});
       
       // Analytics are now calculated dynamically from filtered clients
@@ -234,7 +248,7 @@ const ClientManagement = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter, unassignedFilter, duplicateFilter, dateFilter, endDateFilter, dateNavigationType]);
 
   // Fetch global analytics whenever filters change (but not pagination)
   useEffect(() => {
@@ -257,6 +271,20 @@ const ClientManagement = () => {
     };
 
     fetchAgentsAndCountries();
+  }, []);
+
+  // Close status filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (statusFilterRef.current && !statusFilterRef.current.contains(event.target)) {
+        setShowStatusFilter(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, []);
 
   // Handle search input change
@@ -334,6 +362,51 @@ const ClientManagement = () => {
     }
     setSelectedClients(newSelectedClients);
     setSelectAll(newSelectedClients.size === clients.length);
+  };
+
+  // Find duplicate clients based on name, email, and phone
+  const findDuplicateClients = (clientsList) => {
+    const duplicates = new Set();
+    const seen = new Map();
+
+    clientsList.forEach(client => {
+      // Create keys for different types of duplicates
+      const nameKey = `${client.firstName?.toLowerCase() || ''}_${client.lastName?.toLowerCase() || ''}`;
+      const emailKey = client.email?.toLowerCase() || '';
+      const phoneKey = client.phone?.replace(/\D/g, '') || ''; // Remove non-digits for phone comparison
+
+      // Check for name duplicates
+      if (nameKey && nameKey !== '_') {
+        if (seen.has(`name_${nameKey}`)) {
+          duplicates.add(client._id);
+          duplicates.add(seen.get(`name_${nameKey}`));
+        } else {
+          seen.set(`name_${nameKey}`, client._id);
+        }
+      }
+
+      // Check for email duplicates
+      if (emailKey) {
+        if (seen.has(`email_${emailKey}`)) {
+          duplicates.add(client._id);
+          duplicates.add(seen.get(`email_${emailKey}`));
+        } else {
+          seen.set(`email_${emailKey}`, client._id);
+        }
+      }
+
+      // Check for phone duplicates
+      if (phoneKey) {
+        if (seen.has(`phone_${phoneKey}`)) {
+          duplicates.add(client._id);
+          duplicates.add(seen.get(`phone_${phoneKey}`));
+        } else {
+          seen.set(`phone_${phoneKey}`, client._id);
+        }
+      }
+    });
+
+    return Array.from(duplicates);
   };
 
   // Handle assign clients to agent
@@ -932,7 +1005,7 @@ const ClientManagement = () => {
                  id="selectAll" 
                  checked={selectAll}
                  onChange={(e) => handleSelectAll(e.target.checked)}
-                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                 className="w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                />
                <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
                  Select All
@@ -961,16 +1034,163 @@ const ClientManagement = () => {
                </button>
              </div>
            </div>
-           <div className="flex items-center space-x-3">
+           <div className="flex items-center space-x-2">
+             {/* Duplicate Clients Button */}
+             <button 
+               onClick={() => {
+                 setDuplicateFilter(!duplicateFilter);
+                 setCurrentPage(1); // Reset to first page when filter changes
+               }}
+               className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+                 duplicateFilter 
+                   ? 'bg-red-600 hover:bg-red-700' 
+                   : 'bg-gray-600 hover:bg-gray-700'
+               }`}
+             >
+               <Copy className="w-4 h-4" />
+               <span>Duplicates</span>
+             </button>
+             
+             {/* Search by Status Button */}
+             <div className="relative" ref={statusFilterRef}>
+               <button 
+                 onClick={() => setShowStatusFilter(!showStatusFilter)}
+                 className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+                   statusFilter !== 'all' 
+                     ? 'bg-red-600 hover:bg-red-700' 
+                     : 'bg-gray-600 hover:bg-gray-700'
+                 }`}
+               >
+                 <Filter className="w-4 h-4" />
+                 <span>Status</span>
+               </button>
+               
+               {/* Status Filter Dropdown */}
+               {showStatusFilter && (
+                 <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                   <div className="py-1">
+                     <button
+                       onClick={() => {
+                         setStatusFilter('all');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       All Statuses
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('Call Again');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'Call Again' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Call Again
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('Not Interested');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'Not Interested' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Not Interested
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('Hang Up');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'Hang Up' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Hang Up
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('NA5UP');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'NA5UP' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       NA5UP
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('No Answer');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'No Answer' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       No Answer
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('Wrong Number');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'Wrong Number' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Wrong Number
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('FTD');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'FTD' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       FTD
+                     </button>
+                     <button
+                       onClick={() => {
+                         setStatusFilter('FTD RETENTION');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'FTD RETENTION' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       FTD RETENTION
+                     </button>
+                   </div>
+                 </div>
+               )}
+             </div>
+             
              <button 
                onClick={() => {
                  fetchBulkCampaignClients();
                  setShowBulkCampaignModal(true);
                }}
-               className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-2"
+               className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-1"
              >
                <Users className="w-4 h-4" />
-               <span> Campaign Update</span>
+               <span>Campaign</span>
              </button>
              <button 
                onClick={() => {
@@ -981,21 +1201,21 @@ const ClientManagement = () => {
                  }
                  setCurrentPage(1); // Reset to first page when filter changes
                }}
-               className={`px-4 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-2 transition-colors ${
+               className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
                  unassignedFilter 
                    ? 'bg-red-600 hover:bg-red-700' 
                    : 'bg-gray-600 hover:bg-gray-700'
                }`}
              >
                <User className="w-4 h-4" />
-               <span>Unassigned Only</span>
+               <span>Unassigned</span>
              </button>
              <button 
                onClick={() => setShowDateFilterModal(true)}
-               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-2 border-2 border-green-500 hover:border-green-400"
+               className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1 border-2 border-green-500 hover:border-green-400"
              >
-               <Calendar className="w-5 h-5" />
-               <span>Date Filter</span>
+               <Calendar className="w-4 h-4" />
+               <span>Date</span>
              </button>
              <button 
                onClick={handleDeleteClients}
@@ -1011,22 +1231,41 @@ const ClientManagement = () => {
 
       {/* Main Client Table */}
       <div className="mb-6">
+        {/* Duplicate Filter Indicator */}
+        {duplicateFilter && (
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Copy className="w-5 h-5 text-yellow-600" />
+                <span className="text-yellow-800 font-medium">
+                  Showing {clients.length} duplicate client{clients.length !== 1 ? 's' : ''} 
+                  {clients.length > 0 && ' (based on matching name, email, or phone number)'}
+                </span>
+              </div>
+              <button
+                onClick={() => setDuplicateFilter(false)}
+                className="text-yellow-600 hover:text-yellow-800 font-medium text-sm"
+              >
+                Clear Filter
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           
           <div className="overflow-x-auto">
             <table className="w-full min-w-[800px]">
               <thead className="bg-gray-50">
                 <tr>
-                  {isAdmin && (
-                    <th className="px-4 lg:px-6 py-3 text-left">
-                      <input 
-                        type="checkbox" 
-                        checked={selectAll}
-                        onChange={(e) => handleSelectAll(e.target.checked)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </th>
-                  )}
+                  <th className="px-4 lg:px-6 py-3 text-left">
+                    <input 
+                      type="checkbox" 
+                      checked={selectAll}
+                      onChange={(e) => handleSelectAll(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                  </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
@@ -1094,16 +1333,14 @@ const ClientManagement = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {clients.map((client) => (
                   <tr key={client._id} className="hover:bg-gray-50">
-                    {isAdmin && (
-                      <td className="px-4 lg:px-6 py-4">
-                        <input 
-                          type="checkbox" 
-                          checked={selectedClients.has(client._id)}
-                          onChange={(e) => handleClientSelect(client._id, e.target.checked)}
-                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                      </td>
-                    )}
+                    <td className="px-4 lg:px-6 py-4">
+                      <input 
+                        type="checkbox" 
+                        checked={selectedClients.has(client._id)}
+                        onChange={(e) => handleClientSelect(client._id, e.target.checked)}
+                        className="w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                      />
+                    </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900 font-mono">{client.clientId}</td>
                                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -1210,6 +1447,22 @@ const ClientManagement = () => {
                  )}
                </div>
                <div className="flex items-center justify-center space-x-1 lg:space-x-2">
+                 {/* First Page Button */}
+                 {pagination.current > 3 && (
+                   <>
+                     <button 
+                       onClick={() => setCurrentPage(1)}
+                       className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700"
+                     >
+                       1
+                     </button>
+                     {pagination.current > 4 && (
+                       <span className="px-1 text-gray-400">...</span>
+                     )}
+                   </>
+                 )}
+
+                 {/* Previous Button */}
                  <button 
                    onClick={() => setCurrentPage(pagination.current - 1)}
                    disabled={!pagination.hasPrev}
@@ -1217,22 +1470,46 @@ const ClientManagement = () => {
                  >
                    Previous
                  </button>
-                 {Array.from({ length: Math.min(5, pagination.total) }, (_, i) => {
-                   const pageNum = i + 1;
-                   return (
-                     <button 
-                       key={pageNum}
-                       onClick={() => setCurrentPage(pageNum)}
-                       className={`px-2 lg:px-3 py-1 text-xs lg:text-sm rounded ${
-                         pageNum === pagination.current 
-                           ? 'bg-blue-600 text-white' 
-                           : 'text-gray-500 hover:text-gray-700'
-                       }`}
-                     >
-                       {pageNum}
-                     </button>
-                   );
-                 })}
+
+                 {/* Dynamic Page Numbers */}
+                 {(() => {
+                   const current = pagination.current;
+                   const total = pagination.total;
+                   const pages = [];
+                   
+                   // Calculate start and end page numbers
+                   let startPage = Math.max(1, current - 2);
+                   let endPage = Math.min(total, current + 2);
+                   
+                   // Adjust if we're near the beginning or end
+                   if (current <= 3) {
+                     endPage = Math.min(total, 5);
+                   }
+                   if (current >= total - 2) {
+                     startPage = Math.max(1, total - 4);
+                   }
+                   
+                   // Generate page numbers
+                   for (let i = startPage; i <= endPage; i++) {
+                     pages.push(
+                       <button 
+                         key={i}
+                         onClick={() => setCurrentPage(i)}
+                         className={`px-2 lg:px-3 py-1 text-xs lg:text-sm rounded ${
+                           i === current 
+                             ? 'bg-blue-600 text-white' 
+                             : 'text-gray-500 hover:text-gray-700'
+                         }`}
+                       >
+                         {i}
+                       </button>
+                     );
+                   }
+                   
+                   return pages;
+                 })()}
+
+                 {/* Next Button */}
                  <button 
                    onClick={() => setCurrentPage(pagination.current + 1)}
                    disabled={!pagination.hasNext}
@@ -1240,6 +1517,21 @@ const ClientManagement = () => {
                  >
                    Next
                  </button>
+
+                 {/* Last Page Button */}
+                 {pagination.current < pagination.total - 2 && (
+                   <>
+                     {pagination.current < pagination.total - 3 && (
+                       <span className="px-1 text-gray-400">...</span>
+                     )}
+                     <button 
+                       onClick={() => setCurrentPage(pagination.total)}
+                       className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700"
+                     >
+                       {pagination.total}
+                     </button>
+                   </>
+                 )}
                </div>
              </div>
            </div>
@@ -1298,7 +1590,14 @@ const ClientManagement = () => {
                    {/* Lead Status Overview */}
            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
            <div className="flex justify-between items-center mb-4">
-             <h3 className="text-base lg:text-lg font-semibold text-gray-900">Lead Status Overview</h3>
+             <div>
+               <h3 className="text-base lg:text-lg font-semibold text-gray-900">Lead Status Overview</h3>
+               {agentFilter !== 'all' && (
+                 <p className="text-xs text-blue-600 mt-1">
+                   Showing data for: {availableAgents.find(a => a._id === agentFilter)?.firstName} {availableAgents.find(a => a._id === agentFilter)?.lastName}
+                 </p>
+               )}
+             </div>
              {statusFilter !== 'all' && (
                <button
                  onClick={() => setStatusFilter('all')}
@@ -1343,6 +1642,7 @@ const ClientManagement = () => {
                      status._id === 'NA5UP' ? 'bg-teal-500' :
                      status._id === 'Not Interested' ? 'bg-gray-500' :
                      status._id === 'Hang Up' ? 'bg-purple-500' :
+                     status._id === 'Wrong Number' ? 'bg-red-500' :
                      'bg-gray-400'
                    }`}></div>
                    <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
@@ -1356,7 +1656,9 @@ const ClientManagement = () => {
              )) : (
                <div className="text-center py-6">
                  <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                 <p className="text-sm text-gray-500">No status data to display</p>
+                 <p className="text-sm text-gray-500">
+                   {agentFilter !== 'all' ? 'No status data for selected agent' : 'No status data to display'}
+                 </p>
                </div>
              )}
              
