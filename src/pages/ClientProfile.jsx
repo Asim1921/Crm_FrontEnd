@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useToast } from '../context/ToastContext';
-import { clientAPI, taskAPI, click2CallAPI } from '../utils/api';
+import { clientAPI, taskAPI } from '../utils/api';
 import { 
   Phone, 
   MessageCircle, 
@@ -19,18 +18,13 @@ import {
   Users,
   Settings,
   ChevronLeft,
-  ChevronRight,
-  PhoneOff,
-  Volume2,
-  Mic,
-  MicOff
+  ChevronRight
 } from 'lucide-react';
 
 const ClientProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { showToast } = useToast();
   
   const [client, setClient] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -62,14 +56,6 @@ const ClientProfile = () => {
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [bulkCampaign, setBulkCampaign] = useState('Data');
   const [bulkLoading, setBulkLoading] = useState(false);
-
-  // Click2Call states
-  const [click2CallStatus, setClick2CallStatus] = useState('disconnected');
-  const [currentCall, setCurrentCall] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isOnHold, setIsOnHold] = useState(false);
-  const [serviceInfo, setServiceInfo] = useState(null);
-  const [callLoading, setCallLoading] = useState(false);
 
   // Fetch all clients for navigation
   useEffect(() => {
@@ -118,43 +104,6 @@ const ClientProfile = () => {
     }
   }, [id]);
 
-  // Initialize Click2Call service
-  useEffect(() => {
-    const initializeClick2Call = async () => {
-      try {
-        console.log('Initializing Click2Call service...');
-        const statusResult = await click2CallAPI.getServiceStatus();
-        if (statusResult.success) {
-          setClick2CallStatus('connected');
-          setServiceInfo(statusResult);
-          console.log('Click2Call connected successfully:', statusResult);
-        } else {
-          setClick2CallStatus('disconnected');
-          console.log('Click2Call connection failed:', statusResult);
-        }
-      } catch (error) {
-        console.error('Click2Call initialization error:', error);
-        setClick2CallStatus('disconnected');
-      }
-    };
-
-    initializeClick2Call();
-  }, []);
-
-  // Call timer effect
-  useEffect(() => {
-    let interval;
-    if (currentCall) {
-      interval = setInterval(() => {
-        // Force re-render to update call duration
-        setCurrentCall(prev => ({ ...prev }));
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [currentCall]);
-
   // Navigation functions
   const navigateToClient = (direction) => {
     if (direction === 'prev' && currentClientIndex > 0) {
@@ -166,89 +115,16 @@ const ClientProfile = () => {
     }
   };
 
-  // Handle call client using Click2Call
-  const handleCall = async () => {
+  // Handle call client
+  const handleCall = () => {
     if (!client?.phone) {
-      showToast('Client phone number not found', 'error');
+      alert('Client phone number not found');
       return;
     }
-
-    if (click2CallStatus !== 'connected') {
-      showToast('Click2Call service is not connected. Please try again.', 'error');
-      return;
-    }
-
-    if (currentCall) {
-      showToast('A call is already in progress', 'warning');
-      return;
-    }
-
-    try {
-      setCallLoading(true);
-      
-      // Format phone number for Click2Call (remove all non-digits)
-      const phoneNumber = client.phone.replace(/\D/g, '');
-      
-      console.log('Initiating call to:', phoneNumber);
-      
-      // Make the call using Click2Call API
-      const callResult = await click2CallAPI.makeCall({
-        clientId: client._id,
-        phoneNumber: phoneNumber,
-        extension: '1000', // Default extension from Click2Call config
-        context: 'clicktocall',
-        ringtime: '30',
-        callerId: user?.phone || 'Unknown'
-      });
-
-      if (callResult.success) {
-        setCurrentCall({
-          callId: callResult.callId,
-          phoneNumber: phoneNumber,
-          clientId: client._id,
-          clientName: `${client.firstName} ${client.lastName}`,
-          startTime: new Date()
-        });
-        
-        showToast('Call Connected', 'success');
-        console.log('Call initiated successfully:', callResult);
-      } else {
-        showToast(`Call failed: ${callResult.message || 'Unknown error'}`, 'error');
-        console.error('Call failed:', callResult);
-      }
-    } catch (error) {
-      console.error('Error initiating call:', error);
-      showToast(`Call error: ${error.message}`, 'error');
-    } finally {
-      setCallLoading(false);
-    }
-  };
-
-  // End current call
-  const endCall = async () => {
-    try {
-      if (currentCall && currentCall.callId) {
-        const endResult = await click2CallAPI.endCall(currentCall.callId);
-        if (endResult.success) {
-          console.log('Call ended successfully:', endResult);
-          showToast('Call ended', 'info');
-        }
-      }
-      
-      setCurrentCall(null);
-      setIsMuted(false);
-      setIsOnHold(false);
-    } catch (error) {
-      console.error('Error ending call:', error);
-      showToast(`Error ending call: ${error.message}`, 'error');
-    }
-  };
-
-  // Toggle mute
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    // Note: Actual mute functionality would need to be implemented with the Click2Call service
-    showToast(isMuted ? 'Microphone unmuted' : 'Microphone muted', 'info');
+    
+    const phoneNumber = client.phone.replace(/\D/g, '');
+    const telUrl = `tel:${phoneNumber}`;
+    window.open(telUrl, '_self');
   };
 
 
@@ -736,46 +612,14 @@ const ClientProfile = () => {
               </div>
               
               <div className="flex items-center justify-center space-x-4">
-                {currentCall ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                      <span>Call Active</span>
-                    </div>
-                    <button
-                      onClick={toggleMute}
-                      className={`p-1 rounded-full transition-colors ${
-                        isMuted ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                      title={isMuted ? 'Unmute' : 'Mute'}
-                    >
-                      {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    </button>
-                    <button
-                      onClick={endCall}
-                      className="p-1 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
-                      title="End Call"
-                    >
-                      <PhoneOff className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleCall}
-                    disabled={callLoading || click2CallStatus !== 'connected'}
-                    className={`flex items-center space-x-2 transition-colors ${
-                      callLoading || click2CallStatus !== 'connected'
-                        ? 'text-gray-400 cursor-not-allowed'
-                        : 'text-gray-600 hover:text-blue-600'
-                    }`}
-                    title={click2CallStatus !== 'connected' ? 'Click2Call not connected' : 'Call Client'}
-                  >
-                    <Phone className="w-4 h-4" />
-                    <span className="text-sm">
-                      {callLoading ? 'Calling...' : 'Call'}
-                    </span>
-                  </button>
-                )}
+                <button
+                  onClick={handleCall}
+                  className="flex items-center space-x-2 text-gray-600 hover:text-blue-600 transition-colors"
+                  title="Call Client"
+                >
+                  <Phone className="w-4 h-4" />
+                  <span className="text-sm">Call</span>
+                </button>
 
                 <button
                   onClick={handleEmail}
@@ -809,59 +653,13 @@ const ClientProfile = () => {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
             
             <div className="space-y-3">
-              {currentCall ? (
-                <div className="space-y-2">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-sm font-medium text-green-800">Call Active</span>
-                      </div>
-                      <span className="text-xs text-green-600">
-                        {Math.floor((new Date() - currentCall.startTime) / 1000 / 60)}:{(Math.floor((new Date() - currentCall.startTime) / 1000) % 60).toString().padStart(2, '0')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-green-700 mt-1">Calling {currentCall.clientName}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={toggleMute}
-                      className={`flex-1 py-2 px-3 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
-                        isMuted 
-                          ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                      <span className="text-sm">{isMuted ? 'Unmute' : 'Mute'}</span>
-                    </button>
-                    <button
-                      onClick={endCall}
-                      className="flex-1 bg-red-600 text-white py-2 px-3 rounded-lg hover:bg-red-700 transition-colors flex items-center justify-center space-x-2"
-                    >
-                      <PhoneOff className="w-4 h-4" />
-                      <span className="text-sm">End Call</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={handleCall}
-                  disabled={callLoading || click2CallStatus !== 'connected'}
-                  className={`w-full py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
-                    callLoading || click2CallStatus !== 'connected'
-                      ? 'bg-gray-400 text-white cursor-not-allowed'
-                      : 'bg-green-600 text-white hover:bg-green-700'
-                  }`}
-                >
-                  <Phone className="w-4 h-4" />
-                  <span>
-                    {callLoading ? 'Calling...' : 
-                     click2CallStatus !== 'connected' ? 'Service Unavailable' : 
-                     'Call Client'}
-                  </span>
-                </button>
-              )}
+              <button
+                onClick={handleCall}
+                className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2"
+              >
+                <Phone className="w-4 h-4" />
+                <span>Call Client</span>
+              </button>
               
               <button
                 onClick={handleEmail}
