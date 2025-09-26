@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useToast } from '../context/ToastContext';
 import { Device } from '@twilio/voice-sdk';
 import { 
   Phone,
@@ -21,7 +22,7 @@ import {
   MicOff,
   PhoneOff
 } from 'lucide-react';
-import { communicationAPI, clientAPI, twilioAPI, callStatsAPI } from '../utils/api';
+import { communicationAPI, clientAPI, click2CallAPI, callStatsAPI } from '../utils/api';
 import BrowserCallInterface from '../components/BrowserCallInterface';
 
 
@@ -29,6 +30,7 @@ import BrowserCallInterface from '../components/BrowserCallInterface';
 const CommunicationsHub = () => {
   const { user } = useAuth();
   const { addCallNotification, addMessageNotification, addEmailNotification } = useNotifications();
+  const { showToast } = useToast();
   const [stats, setStats] = useState({
     activeCalls: { value: 0, change: '+0%' },
     messagesSent: { value: 0, change: '+0%' },
@@ -64,14 +66,14 @@ const CommunicationsHub = () => {
   const [emailData, setEmailData] = useState({ clientId: '', subject: '', content: '', email: '' });
   const [agentData, setAgentData] = useState({ firstName: '', lastName: '', email: '', role: 'agent' });
   
-  // Twilio VoIP states
-  const [twilioStatus, setTwilioStatus] = useState('disconnected');
+  // Click2Call VoIP states
+  const [click2CallStatus, setClick2CallStatus] = useState('disconnected');
   const [currentCall, setCurrentCall] = useState(null);
   const [callHistory, setCallHistory] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
   const [isOnHold, setIsOnHold] = useState(false);
-  const [accountInfo, setAccountInfo] = useState(null);
-  const twilioRef = useRef(null);
+  const [serviceInfo, setServiceInfo] = useState(null);
+  const click2CallRef = useRef(null);
   
   // Browser-based voice call states
   const [browserDevice, setBrowserDevice] = useState(null);
@@ -153,31 +155,34 @@ Best regards,
     agent: false
   });
 
-  // Twilio VoIP functions
-  const initializeTwilio = async () => {
+  // Click2Call VoIP functions
+  const initializeClick2Call = async () => {
     try {
-      // Test Twilio connection by getting account info
-      const accountResult = await twilioAPI.getAccountInfo();
-      if (accountResult.success) {
-        setTwilioStatus('connected');
-        setAccountInfo(accountResult);
-        console.log('Twilio connected successfully:', accountResult);
+      console.log('Initializing Click2Call service...');
+      // Test Click2Call connection by getting service status
+      const statusResult = await click2CallAPI.getServiceStatus();
+      if (statusResult.success) {
+        setClick2CallStatus('connected');
+        setServiceInfo(statusResult);
+        console.log('Click2Call connected successfully:', statusResult);
       } else {
-        setTwilioStatus('error');
-        console.error('Twilio connection failed:', accountResult.error);
+        setClick2CallStatus('error');
+        console.error('Click2Call connection failed:', statusResult.error);
       }
     } catch (error) {
-      console.error('Error initializing Twilio:', error);
-      setTwilioStatus('error');
+      console.error('Error initializing Click2Call:', error);
+      setClick2CallStatus('error');
+      // Don't show error to user immediately, just log it
+      console.log('Click2Call service may be unavailable, but system will continue to work');
     }
   };
 
-  const initiateTwilioCall = async (phoneNumber, clientId) => {
+  const initiateClick2Call = async (phoneNumber, clientId) => {
     try {
       // Validate and format phone number
       const validatedNumber = validatePhoneNumber(phoneNumber);
       if (!validatedNumber) {
-        alert('Invalid phone number format. Please enter a valid number.');
+        showToast('Invalid phone number format. Please enter a valid number.', 'error');
         return;
       }
 
@@ -188,17 +193,22 @@ Best regards,
         stream.getTracks().forEach(track => track.stop()); // Stop the stream after permission
       } catch (micError) {
         console.warn('Microphone permission denied:', micError);
-        alert('Microphone permission is required for calling. Please enable it and try again.');
+        showToast('Microphone permission is required for calling. Please enable it and try again.', 'error');
         return;
       }
 
-      setTwilioStatus('connecting');
+      setClick2CallStatus('connecting');
       
-      // Make the call using new Twilio API with browser-based calling
-      const callResult = await twilioAPI.makeCall({
+      // Make the call using Click2Call API
+      const callResult = await click2CallAPI.makeCall({
         clientId: clientId,
         phoneNumber: validatedNumber,
-        useBrowserCall: true // Enable browser-based calling
+        extension: '1000', // Default extension from Click2Call config
+        context: 'clicktocall',
+        ringtime: '30',
+        CallerID: 'CRM System',
+        nombre: 'CRM User',
+        other: `Client ID: ${clientId}`
       });
       
       if (callResult.success) {
@@ -206,13 +216,13 @@ Best regards,
           number: validatedNumber,
           startTime: new Date(),
           status: 'connecting',
-          callSid: callResult.callSid,
-          twilioStatus: callResult.status,
+          callId: callResult.callId,
+          click2CallStatus: callResult.status,
           communicationId: callResult.communicationId,
           isBrowserCall: true
         });
         
-        setTwilioStatus('connected');
+        setClick2CallStatus('connected');
         
         // Add notification
         addCallNotification(
@@ -220,21 +230,24 @@ Best regards,
           'Client',
           callResult.communicationId
         );
+        
+        // Show success toast message
+        showToast('Call Connected', 'success');
       } else {
-        setTwilioStatus('error');
-        alert(`❌ Call Failed: ${callResult.message || callResult.error}`);
+        setClick2CallStatus('error');
+        showToast(`Call Failed: ${callResult.message || callResult.error}`, 'error');
       }
     } catch (error) {
-      console.error('Error initiating Twilio call:', error);
-      setTwilioStatus('error');
-      alert('Failed to initiate call. Please check your Twilio configuration.');
+      console.error('Error initiating Click2Call:', error);
+      setClick2CallStatus('error');
+      showToast('Failed to initiate call. Please check your Click2Call configuration.', 'error');
     }
   };
 
-  const endTwilioCall = async () => {
+  const endClick2Call = async () => {
     try {
-      if (currentCall && currentCall.callSid) {
-        const endResult = await twilioAPI.endCall(currentCall.callSid);
+      if (currentCall && currentCall.callId) {
+        const endResult = await click2CallAPI.endCall(currentCall.callId);
         if (endResult.success) {
           console.log('Call ended successfully:', endResult);
         }
@@ -255,13 +268,13 @@ Best regards,
       setCurrentCall(null);
       setIsMuted(false);
       setIsOnHold(false);
-      setTwilioStatus('connected');
+      setClick2CallStatus('connected');
     } catch (error) {
       console.error('Error ending call:', error);
     }
   };
 
-  const cancelTwilioCall = () => {
+  const cancelClick2Call = () => {
     if (currentCall) {
       const callEndTime = new Date();
       const callDuration = Math.round((callEndTime - currentCall.startTime) / 1000);
@@ -277,7 +290,7 @@ Best regards,
     setCurrentCall(null);
     setIsMuted(false);
     setIsOnHold(false);
-    setTwilioStatus('connected');
+    setClick2CallStatus('connected');
   };
 
   const toggleMute = () => {
@@ -407,7 +420,7 @@ Best regards,
 
     fetchData();
     fetchCallStats();
-    initializeTwilio();
+    initializeClick2Call();
   }, []);
 
   const handleCall = async (channel = 'voip') => {
@@ -627,9 +640,9 @@ Best regards,
       const selectedClient = clients.find(c => c._id === callData.clientId);
       const clientName = selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : 'Unknown Client';
       
-      // Use Twilio for VoIP calls
+      // Use Click2Call for VoIP calls
       if (callData.channel === 'voip') {
-        await initiateTwilioCall(callData.phoneNumber, callData.clientId);
+        await initiateClick2Call(callData.phoneNumber, callData.clientId);
       } else {
         // Fallback to regular phone call
         window.open(`tel:${callData.phoneNumber}`, '_self');
@@ -992,34 +1005,34 @@ Copy this message and paste it in the chat:
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
               <div>
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900">VoIP Integration</h3>
-                <p className="text-xs lg:text-sm text-gray-600">Twilio VoIP System</p>
+                <p className="text-xs lg:text-sm text-gray-600">Click2Call VoIP System</p>
               </div>
               <span className={`text-xs px-2 py-1 rounded-full ${
-                twilioStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                twilioStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                click2CallStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                click2CallStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
                 'bg-red-100 text-red-800'
               }`}>
-                {twilioStatus === 'connected' ? 'Connected' :
-                 twilioStatus === 'connecting' ? 'Connecting' :
-                 twilioStatus === 'error' ? 'Error' : 'Disconnected'}
+                {click2CallStatus === 'connected' ? 'Connected' :
+                 click2CallStatus === 'connecting' ? 'Connecting' :
+                 click2CallStatus === 'error' ? 'Error' : 'Disconnected'}
               </span>
             </div>
 
             <div className="space-y-4">
-              {/* Twilio Status */}
+              {/* Click2Call Status */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
                 <div className="flex items-center space-x-3">
                   <Phone className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
                   <div>
-                    <span className="text-sm lg:text-base font-medium text-gray-900">Twilio VoIP</span>
+                    <span className="text-sm lg:text-base font-medium text-gray-900">Click2Call VoIP</span>
                     <p className="text-xs text-gray-600">
-                      {twilioStatus === 'connected' ? 'API Connected' :
-                       twilioStatus === 'connecting' ? 'Connecting to Twilio' :
-                       twilioStatus === 'error' ? 'Connection Error' : 'Disconnected'}
+                      {click2CallStatus === 'connected' ? 'Service Connected' :
+                       click2CallStatus === 'connecting' ? 'Connecting to Click2Call' :
+                       click2CallStatus === 'error' ? 'Connection Error' : 'Disconnected'}
                     </p>
-                    {accountInfo && (
+                    {serviceInfo && (
                       <p className="text-xs text-green-600">
-                        Balance: ${accountInfo.balance} {accountInfo.currency}
+                        Service: {serviceInfo.serviceName || 'Click2Call'}
                       </p>
                     )}
                   </div>
@@ -1027,7 +1040,7 @@ Copy this message and paste it in the chat:
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button 
                     onClick={() => handleCall('voip')}
-                    disabled={twilioStatus === 'error'}
+                    disabled={click2CallStatus === 'error'}
                     className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                   >
                     <Phone className="w-4 h-4" />
@@ -1055,7 +1068,7 @@ Copy this message and paste it in the chat:
                      <div className="flex items-center space-x-2">
                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                        <span className="text-sm lg:text-base font-medium text-green-800">
-                         {currentCall.twilioStatus === 'initiated' ? 'Call Initiated' : 'Active Call'}
+                         {currentCall.click2CallStatus === 'initiated' ? 'Call Initiated' : 'Active Call'}
                        </span>
                 </div>
                      <span className="text-xs lg:text-sm text-green-600">
@@ -1065,19 +1078,19 @@ Copy this message and paste it in the chat:
 
                    <p className="text-xs lg:text-sm text-green-700 mb-3">Calling: {formatPhoneNumber(currentCall.number)}</p>
                    
-                   {currentCall.callSid && (
+                   {currentCall.callId && (
                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
                   <p className="text-sm text-blue-800">
-                         <strong>Call SID:</strong> {currentCall.callSid}
+                         <strong>Call ID:</strong> {currentCall.callId}
                        </p>
                        <p className="text-xs text-blue-600 mt-1">
-                         Status: {currentCall.twilioStatus}
+                         Status: {currentCall.click2CallStatus}
                   </p>
                 </div>
                    )}
                    
                    <div className="flex flex-wrap gap-2">
-                     {twilioStatus === 'connected' && (
+                     {click2CallStatus === 'connected' && (
                        <>
                          <button
                            onClick={toggleMute}
@@ -1102,7 +1115,7 @@ Copy this message and paste it in the chat:
                      )}
                      
                      <button
-                       onClick={endTwilioCall}
+                       onClick={endClick2Call}
                        className="p-2 rounded-lg bg-red-100 text-red-700 flex items-center space-x-1"
                      >
                        <PhoneOff className="w-4 h-4" />
@@ -1110,7 +1123,7 @@ Copy this message and paste it in the chat:
                      </button>
                      
                      <button
-                       onClick={cancelTwilioCall}
+                       onClick={cancelClick2Call}
                        className="p-2 rounded-lg bg-gray-100 text-gray-700 flex items-center space-x-1"
                      >
                        <X className="w-4 h-4" />
@@ -1150,28 +1163,51 @@ Copy this message and paste it in the chat:
                 <div className="flex items-start space-x-3">
                   <Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600 mt-0.5" />
                   <div className="text-xs lg:text-sm text-blue-800">
-                    <p className="font-medium mb-1">Twilio VoIP Integration</p>
+                    <p className="font-medium mb-1">Click2Call VoIP Integration</p>
                     <p>
-                      {twilioStatus === 'connected' ? 
-                        'Full API integration available. Calls will be made through Twilio cloud service.' :
-                       twilioStatus === 'connecting' ? 
-                        'Connecting to Twilio...' :
-                       'Twilio integration not available. Check configuration.'}
+                      {click2CallStatus === 'connected' ? 
+                        'Full API integration available. Calls will be made through Click2Call service.' :
+                       click2CallStatus === 'connecting' ? 
+                        'Connecting to Click2Call...' :
+                       'Click2Call integration not available. Check configuration.'}
                     </p>
-                    {twilioStatus === 'error' && (
-                <button 
-                        onClick={() => setShowTwilioGuideModal(true)}
-                        className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
-                >
-                        View Integration Guide →
-                </button>
+                    {click2CallStatus === 'error' && (
+                      <div className="mt-2 space-x-2">
+                        <button 
+                          onClick={() => initializeClick2Call()}
+                          className="text-green-600 hover:text-green-800 font-medium text-xs"
+                        >
+                          🔄 Retry Connection
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const result = await click2CallAPI.testCall();
+                              console.log('Test call result:', result);
+                              showToast(`Test Call: ${result.success ? 'Success' : 'Failed'}`, result.success ? 'success' : 'error');
+                            } catch (error) {
+                              console.error('Test call error:', error);
+                              showToast(`Test Call Error: ${error.message}`, 'error');
+                            }
+                          }}
+                          className="text-purple-600 hover:text-purple-800 font-medium text-xs"
+                        >
+                          🧪 Test Call
+                        </button>
+                        <button 
+                          onClick={() => setShowTwilioGuideModal(true)}
+                          className="text-blue-600 hover:text-blue-800 font-medium text-xs"
+                        >
+                          View Integration Guide →
+                        </button>
+                      </div>
                     )}
-                    {twilioStatus === 'connected' && (
+                    {click2CallStatus === 'connected' && (
                 <button 
                         onClick={() => setShowTwilioGuideModal(true)}
                         className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
                 >
-                        View Account Info →
+                        View Service Info →
                 </button>
                     )}
               </div>
@@ -1762,12 +1798,12 @@ Copy this message and paste it in the chat:
          </div>
        )}
 
-               {/* Twilio Integration Guide Modal */}
+               {/* Click2Call Integration Guide Modal */}
         {showTwilioGuideModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Twilio VoIP Integration Guide</h3>
+                <h3 className="text-lg font-semibold">Click2Call VoIP Integration Guide</h3>
                 <button onClick={() => setShowTwilioGuideModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
@@ -1775,20 +1811,20 @@ Copy this message and paste it in the chat:
               
               <div className="space-y-6">
                 <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">What is Twilio?</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">What is Click2Call?</h4>
                   <p className="text-sm text-blue-800">
-                    Twilio is a cloud communications platform that enables you to make and receive phone calls, 
-                    send and receive text messages, and other communications functions using its web service APIs.
+                    Click2Call is a VoIP service that enables you to make calls through your existing phone system. 
+                    It connects your CRM to your PBX system for seamless calling functionality.
                   </p>
                 </div>
 
                 <div className="bg-yellow-50 rounded-lg p-4">
                   <h4 className="font-medium text-yellow-900 mb-2">How It Works:</h4>
                   <ul className="text-sm text-yellow-800 space-y-1">
-                    <li>• When you make a call, Twilio will call your registered phone number first</li>
-                    <li>• Once you answer, Twilio will connect you to the target number</li>
-                    <li>• All calls are made through Twilio's cloud infrastructure</li>
-                    <li>• Call quality and reliability are managed by Twilio</li>
+                    <li>• When you make a call, Click2Call will call your extension first</li>
+                    <li>• Once you answer, Click2Call will connect you to the target number</li>
+                    <li>• All calls are made through your existing PBX system</li>
+                    <li>• Call quality and reliability are managed by your PBX</li>
                     <li>• No additional software installation required</li>
                   </ul>
                 </div>
@@ -1796,11 +1832,11 @@ Copy this message and paste it in the chat:
                 <div className="bg-green-50 rounded-lg p-4">
                   <h4 className="font-medium text-green-900 mb-2">Benefits:</h4>
                   <ul className="text-sm text-green-800 space-y-1">
-                    <li>• Professional call quality</li>
+                    <li>• Professional call quality through your PBX</li>
                     <li>• No software installation required</li>
-                    <li>• Call recording and analytics</li>
-                    <li>• Global phone number support</li>
-                    <li>• Reliable cloud infrastructure</li>
+                    <li>• Integration with existing phone system</li>
+                    <li>• Cost-effective calling solution</li>
+                    <li>• Reliable PBX infrastructure</li>
                     <li>• Detailed call logs and reporting</li>
                   </ul>
                 </div>
@@ -1809,17 +1845,17 @@ Copy this message and paste it in the chat:
                   <h4 className="font-medium text-blue-900 mb-2">Testing:</h4>
                   <p className="text-sm text-blue-800">
                     To test the integration, try making a call to any phone number. 
-                    Twilio will first call your registered number, then connect you to the target.
+                    Click2Call will first call your extension, then connect you to the target.
                   </p>
                 </div>
               </div>
               
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
                 <button 
-                  onClick={() => window.open('https://www.twilio.com', '_blank')}
+                  onClick={() => window.open('https://pbx07.t-lan.co:3000', '_blank')}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                 >
-                  Visit Twilio
+                  Visit Click2Call Service
                 </button>
                 <button 
                   onClick={() => setShowTwilioGuideModal(false)}

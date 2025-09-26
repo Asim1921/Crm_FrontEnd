@@ -79,7 +79,7 @@ class SessionManager {
       const hoursUntilRefresh = Math.round(finalRefreshTime / 1000 / 60 / 60);
       const daysUntilExpiry = Math.round(timeUntilExpiry / 1000 / 60 / 60 / 24);
       
-      console.log(`Token expires in ${daysUntilExpiry} days, scheduling refresh in ${hoursUntilRefresh} hours`);
+      // console.log(`Token expires in ${daysUntilExpiry} days, scheduling refresh in ${hoursUntilRefresh} hours`);
       
       this.tokenRefreshTimer = setTimeout(() => {
         this.refreshToken();
@@ -101,7 +101,7 @@ class SessionManager {
     }
 
     this.isRefreshing = true;
-    console.log('Starting token refresh...');
+    
     
     const refreshToken = localStorage.getItem('refreshToken');
 

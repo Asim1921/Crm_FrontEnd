@@ -335,6 +335,74 @@ export const communicationAPI = {
 };
 
 // CLICK2CALL API calls
+export const click2CallAPI = {
+  // Initialize Click2Call service
+  initialize: async () => {
+    try {
+      const response = await apiRequest('/click2call/initialize', {
+        method: 'POST'
+      });
+      return response;
+    } catch (error) {
+      console.error('Click2Call initialization error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Get service status
+  getServiceStatus: async () => {
+    try {
+      const response = await apiRequest('/click2call/status');
+      return response;
+    } catch (error) {
+      console.error('Click2Call status error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Make a call using Click2Call
+  makeCall: async (callData) => {
+    try {
+      const response = await apiRequest('/click2call/call', {
+        method: 'POST',
+        body: JSON.stringify(callData)
+      });
+      return response;
+    } catch (error) {
+      console.error('Click2Call error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // End a call
+  endCall: async (callId) => {
+    try {
+      const response = await apiRequest('/click2call/end-call', {
+        method: 'POST',
+        body: JSON.stringify({ callId })
+      });
+      return response;
+    } catch (error) {
+      console.error('Click2Call end call error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Test call (for debugging)
+  testCall: async () => {
+    try {
+      const response = await apiRequest('/click2call/test-call', {
+        method: 'POST'
+      });
+      return response;
+    } catch (error) {
+      console.error('Click2Call test call error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+};
+
+// Keep Twilio API for backward compatibility (deprecated)
 export const twilioAPI = {
   // Initialize Twilio
   initialize: async () => {
@@ -543,6 +611,7 @@ export default {
   users: userAPI,
   communications: communicationAPI,
   callStats: callStatsAPI,
+  click2Call: click2CallAPI,
   twilio: twilioAPI,
   kyc: kycAPI
 };
