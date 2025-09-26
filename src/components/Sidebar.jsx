@@ -10,7 +10,8 @@ import {
   Settings, 
   LogOut,
   User,
-  ExternalLink
+  ExternalLink,
+  FileCheck
 } from 'lucide-react';
 import logo from '../logo.png';
 
@@ -83,6 +84,11 @@ const Sidebar = ({ onLogoutClick }) => {
       name: 'Reports & Analytics', 
       icon: BarChart3, 
       path: '/reports' 
+    },
+    { 
+      name: 'Personal KYC', 
+      icon: FileCheck, 
+      path: '/kyc' 
     },
     { 
       name: 'Settings', 

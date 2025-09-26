@@ -414,6 +414,126 @@ export const callStatsAPI = {
   }
 };
 
+// KYC API
+export const kycAPI = {
+  submitKyc: async (formData) => {
+    console.log('Submitting to:', getApiUrl('/kyc/submit'));
+    
+    // For FormData, we need to let the browser set the Content-Type header
+    // to include the boundary parameter
+    const headers = getAuthHeaders();
+    delete headers['Content-Type']; // Remove Content-Type to let browser set it
+    
+    console.log('Headers:', headers);
+    
+    const response = await fetch(getApiUrl('/kyc/submit'), {
+      method: 'POST',
+      headers: headers,
+      body: formData
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch (e) {
+        error = { message: errorText };
+      }
+      throw new Error(error.message || 'Failed to submit KYC documents');
+    }
+
+    return response.json();
+  },
+
+  getUserKyc: async (userId) => {
+    const response = await fetch(getApiUrl(`/kyc/user/${userId}`), {
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null; // No KYC data found
+      }
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch KYC data');
+    }
+
+    return response.json();
+  },
+
+  getAllKyc: async () => {
+    const response = await fetch(getApiUrl('/kyc/all'), {
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to fetch KYC data');
+    }
+
+    return response.json();
+  },
+
+  downloadDocument: async (kycId, documentType, fileName) => {
+    const response = await fetch(getApiUrl(`/kyc/${kycId}/download/${documentType}`), {
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to download document');
+    }
+
+    // Create blob and download
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+
+  updateKycStatus: async (kycId, status, reviewNotes) => {
+    const response = await fetch(getApiUrl(`/kyc/${kycId}/status`), {
+      method: 'PUT',
+      headers: {
+        ...getAuthHeaders(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status, reviewNotes })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to update KYC status');
+    }
+
+    return response.json();
+  },
+
+  deleteKyc: async (kycId) => {
+    const response = await fetch(getApiUrl(`/kyc/${kycId}`), {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to delete KYC submission');
+    }
+
+    return response.json();
+  }
+};
+
 // Export default for convenience
 export default {
   auth: authAPI,
@@ -423,5 +543,6 @@ export default {
   users: userAPI,
   communications: communicationAPI,
   callStats: callStatsAPI,
-  twilio: twilioAPI
+  twilio: twilioAPI,
+  kyc: kycAPI
 };

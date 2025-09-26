@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { ToastProvider } from './context/ToastContext';
 import { SearchProvider } from './context/SearchContext';
 import PrivateRoute from './components/PrivateRoute';
 import Login from './pages/Login';
@@ -12,13 +13,15 @@ import CommunicationsHub from './pages/CommunicationsHub';
 import ReportsAnalytics from './pages/ReportsAnalytics';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
+import PersonalKYC from './pages/PersonalKYC';
 import './styles/globals.css';
 
 function App() {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <SearchProvider>
+        <ToastProvider>
+          <SearchProvider>
           <Router>
             <div className="App">
               <Routes>
@@ -31,13 +34,15 @@ function App() {
                   <Route path="tasks" element={<TaskManagement />} />
                   <Route path="communications" element={<CommunicationsHub />} />
                   <Route path="reports" element={<ReportsAnalytics />} />
+                  <Route path="kyc" element={<PersonalKYC />} />
                   <Route path="settings" element={<Settings />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
               </Routes>
             </div>
           </Router>
-        </SearchProvider>
+          </SearchProvider>
+        </ToastProvider>
       </NotificationProvider>
     </AuthProvider>
   );
