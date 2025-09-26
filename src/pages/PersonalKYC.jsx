@@ -33,7 +33,8 @@ import {
 import { kycAPI } from '../utils/api';
 
 const PersonalKYC = () => {
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const { showToast } = useToast();
   
   // Form state
@@ -55,9 +56,16 @@ const PersonalKYC = () => {
   
   // Admin view state
   const [allKycData, setAllKycData] = useState([]);
+  const [filteredKycData, setFilteredKycData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Admin filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
 
   // Camera modal state
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -703,9 +711,12 @@ const PersonalKYC = () => {
   // Admin view functions
   const fetchAllKycData = async () => {
     try {
+      console.log('Fetching KYC data...');
       setLoading(true);
       const data = await kycAPI.getAllKyc();
+      console.log('KYC data received:', data);
       setAllKycData(data);
+      setFilteredKycData(data);
     } catch (error) {
       console.error('Error fetching KYC data:', error);
       showToast('Failed to fetch KYC data', 'error');
@@ -713,6 +724,46 @@ const PersonalKYC = () => {
       setLoading(false);
     }
   };
+
+  // Filter KYC data based on search and filters
+  const applyFilters = () => {
+    let filtered = [...allKycData];
+
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(kyc => 
+        kyc.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        kyc.idNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (kyc.userId?.email && kyc.userId.email.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    // Status filter
+    if (statusFilter) {
+      filtered = filtered.filter(kyc => kyc.status === statusFilter);
+    }
+
+    // Country filter
+    if (countryFilter) {
+      filtered = filtered.filter(kyc => kyc.country === countryFilter);
+    }
+
+    // Date filter
+    if (dateFilter) {
+      const filterDate = new Date(dateFilter);
+      filtered = filtered.filter(kyc => {
+        const submissionDate = new Date(kyc.submittedAt);
+        return submissionDate.toDateString() === filterDate.toDateString();
+      });
+    }
+
+    setFilteredKycData(filtered);
+  };
+
+  // Apply filters whenever filter values change
+  useEffect(() => {
+    applyFilters();
+  }, [searchTerm, statusFilter, countryFilter, dateFilter, allKycData]);
 
   const handleDownloadDocument = async (kycId, documentType, fileName) => {
     try {
@@ -739,8 +790,21 @@ const PersonalKYC = () => {
 
   const handleStatusUpdate = async (kycId, status) => {
     try {
+      // Check if status is already approved or rejected
+      const kyc = allKycData.find(k => k._id === kycId);
+      if (kyc && (kyc.status === 'approved' || kyc.status === 'rejected')) {
+        showToast('This KYC has already been processed. User must resubmit documents to change status.', 'warning');
+        return;
+      }
+      
+      const confirmed = window.confirm(
+        `Are you sure you want to ${status} this KYC submission? This action is irreversible and the user will need to resubmit all documents to change the status.`
+      );
+      
+      if (!confirmed) return;
+      
       await kycAPI.updateKycStatus(kycId, status);
-      showToast(`KYC status updated to ${status}`, 'success');
+      showToast(`KYC status updated to ${status}. User must resubmit documents to change status.`, 'success');
       fetchAllKycData();
     } catch (error) {
       console.error('Error updating status:', error);
@@ -748,11 +812,88 @@ const PersonalKYC = () => {
     }
   };
 
+  const handleViewDocuments = (kyc) => {
+    // Create a modal to view all documents
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+    modal.innerHTML = `
+      <div class="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold">KYC Documents - ${kyc.fullName}</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${Object.entries(kyc.documents || {}).map(([docType, doc]) => `
+            <div class="border rounded-lg p-4">
+              <h4 class="font-medium mb-2">${documentTypes[docType]?.label || docType}</h4>
+              ${doc ? `
+                <div class="space-y-2">
+                  <p class="text-sm text-gray-600">File: ${doc.originalName}</p>
+                  <p class="text-sm text-gray-600">Size: ${(doc.size / 1024).toFixed(1)} KB</p>
+                  <p class="text-sm text-gray-600">Uploaded: ${doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : 'N/A'}</p>
+                  <button 
+                    onclick="handleModalDownload('${kyc._id}', '${docType}', '${doc.originalName}')"
+                    class="w-full bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700"
+                  >
+                    Download
+                  </button>
+                </div>
+              ` : `
+                <p class="text-red-600 text-sm">Document not uploaded</p>
+              `}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+    
+    // Add the modal download handler to the global scope
+    window.handleModalDownload = async (kycId, docType, fileName) => {
+      try {
+        await kycAPI.downloadDocument(kycId, docType, fileName);
+        showToast('Document downloaded successfully!', 'success');
+      } catch (error) {
+        console.error('Error downloading document:', error);
+        showToast('Failed to download document', 'error');
+      }
+    };
+    
+    document.body.appendChild(modal);
+  };
+
+  const handleDownloadAllDocuments = async (kyc) => {
+    try {
+      showToast('Preparing download...', 'success');
+      
+      // Download each document
+      for (const [docType, doc] of Object.entries(kyc.documents || {})) {
+        if (doc && doc.fileName) {
+          try {
+            await kycAPI.downloadDocument(kyc._id, docType, doc.originalName);
+          } catch (error) {
+            console.error(`Error downloading ${docType}:`, error);
+          }
+        }
+      }
+      
+      showToast('All documents downloaded successfully!', 'success');
+    } catch (error) {
+      console.error('Error downloading documents:', error);
+      showToast('Failed to download some documents', 'error');
+    }
+  };
+
   useEffect(() => {
+    console.log('Admin check:', { isAdmin, user: user?.email, role: user?.role });
     if (isAdmin) {
+      setCurrentStep(0); // Set admin to show admin panel by default
       fetchAllKycData();
     }
-  }, [isAdmin]);
+  }, [isAdmin, user]);
 
   // Start camera when modal opens
   useEffect(() => {
@@ -774,20 +915,326 @@ const PersonalKYC = () => {
     }
   }, [cameraStream]);
 
-  if (isAdmin) {
+  // If admin is submitting their own KYC, show the form
+  if (isAdmin && currentStep === 1) {
+    // Show the KYC form for admin's own submission - fall through to the regular form
+  } else if (isAdmin && currentStep === 0) {
+    // Show admin panel for managing client submissions
     return (
       <div className="min-h-screen bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">KYC Management</h1>
-                  <p className="text-gray-600 mt-1">Review and manage KYC submissions</p>
-                </div>
+          {/* Header */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">KYC Management</h1>
+                <p className="text-gray-600 mt-1">Review and manage KYC submissions from all clients</p>
+              </div>
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => {
+                    setCurrentStep(1);
+                    // Reset form data for admin's own submission
+                    setFormData({
+                      fullName: '',
+                      idNumber: '',
+                      country: ''
+                    });
+                    setDocuments({
+                      selfie: null,
+                      idFront: null,
+                      idBack: null,
+                      paymentProof: null,
+                      bankStatement: null,
+                      utilityBill: null
+                    });
+                  }}
+                  className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Submit My KYC
+                </button>
                 <div className="flex items-center space-x-2">
                   <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                   <span className="text-sm text-gray-600">System Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search and Filters */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Search Client</label>
+                  <input
+                    type="text"
+                    placeholder="Search by name, ID, or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status Filter</label>
+                  <select 
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Country Filter</label>
+                  <select 
+                    value={countryFilter}
+                    onChange={(e) => setCountryFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">All Countries</option>
+                    <option value="US">United States</option>
+                    <option value="UK">United Kingdom</option>
+                    <option value="CA">Canada</option>
+                    <option value="AU">Australia</option>
+                    <option value="DE">Germany</option>
+                    <option value="FR">France</option>
+                    <option value="ES">Spain</option>
+                    <option value="IT">Italy</option>
+                    <option value="NL">Netherlands</option>
+                    <option value="BE">Belgium</option>
+                    <option value="CH">Switzerland</option>
+                    <option value="AT">Austria</option>
+                    <option value="SE">Sweden</option>
+                    <option value="NO">Norway</option>
+                    <option value="DK">Denmark</option>
+                    <option value="FI">Finland</option>
+                    <option value="PL">Poland</option>
+                    <option value="CZ">Czech Republic</option>
+                    <option value="HU">Hungary</option>
+                    <option value="RO">Romania</option>
+                    <option value="BG">Bulgaria</option>
+                    <option value="HR">Croatia</option>
+                    <option value="SI">Slovenia</option>
+                    <option value="SK">Slovakia</option>
+                    <option value="LT">Lithuania</option>
+                    <option value="LV">Latvia</option>
+                    <option value="EE">Estonia</option>
+                    <option value="IE">Ireland</option>
+                    <option value="PT">Portugal</option>
+                    <option value="GR">Greece</option>
+                    <option value="CY">Cyprus</option>
+                    <option value="MT">Malta</option>
+                    <option value="LU">Luxembourg</option>
+                    <option value="JP">Japan</option>
+                    <option value="KR">South Korea</option>
+                    <option value="CN">China</option>
+                    <option value="IN">India</option>
+                    <option value="BR">Brazil</option>
+                    <option value="MX">Mexico</option>
+                    <option value="AR">Argentina</option>
+                    <option value="CL">Chile</option>
+                    <option value="CO">Colombia</option>
+                    <option value="PE">Peru</option>
+                    <option value="VE">Venezuela</option>
+                    <option value="EC">Ecuador</option>
+                    <option value="UY">Uruguay</option>
+                    <option value="PY">Paraguay</option>
+                    <option value="BO">Bolivia</option>
+                    <option value="GY">Guyana</option>
+                    <option value="SR">Suriname</option>
+                    <option value="GF">French Guiana</option>
+                    <option value="ZA">South Africa</option>
+                    <option value="NG">Nigeria</option>
+                    <option value="EG">Egypt</option>
+                    <option value="KE">Kenya</option>
+                    <option value="GH">Ghana</option>
+                    <option value="MA">Morocco</option>
+                    <option value="TN">Tunisia</option>
+                    <option value="DZ">Algeria</option>
+                    <option value="LY">Libya</option>
+                    <option value="SD">Sudan</option>
+                    <option value="ET">Ethiopia</option>
+                    <option value="UG">Uganda</option>
+                    <option value="TZ">Tanzania</option>
+                    <option value="ZM">Zambia</option>
+                    <option value="ZW">Zimbabwe</option>
+                    <option value="BW">Botswana</option>
+                    <option value="NA">Namibia</option>
+                    <option value="SZ">Eswatini</option>
+                    <option value="LS">Lesotho</option>
+                    <option value="MW">Malawi</option>
+                    <option value="MZ">Mozambique</option>
+                    <option value="MG">Madagascar</option>
+                    <option value="MU">Mauritius</option>
+                    <option value="SC">Seychelles</option>
+                    <option value="RE">Réunion</option>
+                    <option value="YT">Mayotte</option>
+                    <option value="KM">Comoros</option>
+                    <option value="DJ">Djibouti</option>
+                    <option value="SO">Somalia</option>
+                    <option value="ER">Eritrea</option>
+                    <option value="SS">South Sudan</option>
+                    <option value="CF">Central African Republic</option>
+                    <option value="TD">Chad</option>
+                    <option value="NE">Niger</option>
+                    <option value="ML">Mali</option>
+                    <option value="BF">Burkina Faso</option>
+                    <option value="CI">Côte d'Ivoire</option>
+                    <option value="LR">Liberia</option>
+                    <option value="SL">Sierra Leone</option>
+                    <option value="GN">Guinea</option>
+                    <option value="GW">Guinea-Bissau</option>
+                    <option value="GM">Gambia</option>
+                    <option value="SN">Senegal</option>
+                    <option value="MR">Mauritania</option>
+                    <option value="CV">Cape Verde</option>
+                    <option value="ST">São Tomé and Príncipe</option>
+                    <option value="GQ">Equatorial Guinea</option>
+                    <option value="GA">Gabon</option>
+                    <option value="CG">Republic of the Congo</option>
+                    <option value="CD">Democratic Republic of the Congo</option>
+                    <option value="AO">Angola</option>
+                    <option value="CM">Cameroon</option>
+                    <option value="CF">Central African Republic</option>
+                    <option value="TD">Chad</option>
+                    <option value="NE">Niger</option>
+                    <option value="ML">Mali</option>
+                    <option value="BF">Burkina Faso</option>
+                    <option value="CI">Côte d'Ivoire</option>
+                    <option value="LR">Liberia</option>
+                    <option value="SL">Sierra Leone</option>
+                    <option value="GN">Guinea</option>
+                    <option value="GW">Guinea-Bissau</option>
+                    <option value="GM">Gambia</option>
+                    <option value="SN">Senegal</option>
+                    <option value="MR">Mauritania</option>
+                    <option value="CV">Cape Verde</option>
+                    <option value="ST">São Tomé and Príncipe</option>
+                    <option value="GQ">Equatorial Guinea</option>
+                    <option value="GA">Gabon</option>
+                    <option value="CG">Republic of the Congo</option>
+                    <option value="CD">Democratic Republic of the Congo</option>
+                    <option value="AO">Angola</option>
+                    <option value="CM">Cameroon</option>
+                    <option value="RU">Russia</option>
+                    <option value="UA">Ukraine</option>
+                    <option value="BY">Belarus</option>
+                    <option value="MD">Moldova</option>
+                    <option value="GE">Georgia</option>
+                    <option value="AM">Armenia</option>
+                    <option value="AZ">Azerbaijan</option>
+                    <option value="KZ">Kazakhstan</option>
+                    <option value="UZ">Uzbekistan</option>
+                    <option value="TM">Turkmenistan</option>
+                    <option value="TJ">Tajikistan</option>
+                    <option value="KG">Kyrgyzstan</option>
+                    <option value="MN">Mongolia</option>
+                    <option value="AF">Afghanistan</option>
+                    <option value="PK">Pakistan</option>
+                    <option value="BD">Bangladesh</option>
+                    <option value="LK">Sri Lanka</option>
+                    <option value="MV">Maldives</option>
+                    <option value="BT">Bhutan</option>
+                    <option value="NP">Nepal</option>
+                    <option value="MM">Myanmar</option>
+                    <option value="TH">Thailand</option>
+                    <option value="LA">Laos</option>
+                    <option value="KH">Cambodia</option>
+                    <option value="VN">Vietnam</option>
+                    <option value="MY">Malaysia</option>
+                    <option value="SG">Singapore</option>
+                    <option value="BN">Brunei</option>
+                    <option value="ID">Indonesia</option>
+                    <option value="PH">Philippines</option>
+                    <option value="TL">East Timor</option>
+                    <option value="PG">Papua New Guinea</option>
+                    <option value="FJ">Fiji</option>
+                    <option value="VU">Vanuatu</option>
+                    <option value="SB">Solomon Islands</option>
+                    <option value="NC">New Caledonia</option>
+                    <option value="PF">French Polynesia</option>
+                    <option value="WS">Samoa</option>
+                    <option value="TO">Tonga</option>
+                    <option value="KI">Kiribati</option>
+                    <option value="TV">Tuvalu</option>
+                    <option value="NR">Nauru</option>
+                    <option value="PW">Palau</option>
+                    <option value="FM">Micronesia</option>
+                    <option value="MH">Marshall Islands</option>
+                    <option value="NZ">New Zealand</option>
+                    <option value="IS">Iceland</option>
+                    <option value="GL">Greenland</option>
+                    <option value="FO">Faroe Islands</option>
+                    <option value="SJ">Svalbard and Jan Mayen</option>
+                    <option value="AD">Andorra</option>
+                    <option value="LI">Liechtenstein</option>
+                    <option value="MC">Monaco</option>
+                    <option value="SM">San Marino</option>
+                    <option value="VA">Vatican City</option>
+                    <option value="AL">Albania</option>
+                    <option value="BA">Bosnia and Herzegovina</option>
+                    <option value="ME">Montenegro</option>
+                    <option value="MK">North Macedonia</option>
+                    <option value="RS">Serbia</option>
+                    <option value="XK">Kosovo</option>
+                    <option value="TR">Turkey</option>
+                    <option value="IL">Israel</option>
+                    <option value="PS">Palestine</option>
+                    <option value="JO">Jordan</option>
+                    <option value="LB">Lebanon</option>
+                    <option value="SY">Syria</option>
+                    <option value="IQ">Iraq</option>
+                    <option value="IR">Iran</option>
+                    <option value="KW">Kuwait</option>
+                    <option value="SA">Saudi Arabia</option>
+                    <option value="AE">United Arab Emirates</option>
+                    <option value="QA">Qatar</option>
+                    <option value="BH">Bahrain</option>
+                    <option value="OM">Oman</option>
+                    <option value="YE">Yemen</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* KYC Submissions Table */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900">Client KYC Submissions</h2>
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm text-gray-500">
+                    {filteredKycData.length} of {allKycData.length} submissions
+                  </span>
+                  {(searchTerm || statusFilter || countryFilter || dateFilter) && (
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setStatusFilter('');
+                        setCountryFilter('');
+                        setDateFilter('');
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -802,29 +1249,48 @@ const PersonalKYC = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Number</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documents</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {allKycData.map((kyc) => (
+                      {filteredKycData.map((kyc) => (
                         <tr key={kyc._id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                <User className="w-4 h-4 text-blue-600" />
+                              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="w-5 h-5 text-blue-600" />
                               </div>
-                              <div className="ml-3">
+                              <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">{kyc.fullName}</div>
+                                <div className="text-sm text-gray-500">{kyc.userId?.email || 'No email'}</div>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{kyc.idNumber}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{kyc.country}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-1">
+                              {kyc.documents && Object.keys(kyc.documents).map((docType) => (
+                                <div key={docType} className="flex items-center">
+                                  {kyc.documents[docType] ? (
+                                    <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                      <CheckCircle className="w-3 h-3 text-green-600" />
+                                    </div>
+                                  ) : (
+                                    <div className="w-6 h-6 bg-red-100 rounded-full flex items-center justify-center">
+                                      <X className="w-3 h-3 text-red-600" />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                               kyc.status === 'approved' ? 'bg-green-100 text-green-800' :
@@ -835,27 +1301,47 @@ const PersonalKYC = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(kyc.submittedAt).toLocaleDateString()}
+                            {kyc.submittedAt ? new Date(kyc.submittedAt).toLocaleDateString() : 'N/A'}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                            <button
-                              onClick={() => handleStatusUpdate(kyc._id, 'approved')}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleStatusUpdate(kyc._id, 'rejected')}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              onClick={() => handleDeleteKyc(kyc._id)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Delete
-                            </button>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleViewDocuments(kyc)}
+                                className="text-blue-600 hover:text-blue-900 flex items-center"
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleDownloadAllDocuments(kyc)}
+                                className="text-green-600 hover:text-green-900 flex items-center"
+                              >
+                                <Download className="w-4 h-4 mr-1" />
+                                Download
+                              </button>
+                              <button
+                                onClick={() => handleStatusUpdate(kyc._id, 'approved')}
+                                disabled={kyc.status === 'approved' || kyc.status === 'rejected'}
+                                className={`${
+                                  kyc.status === 'approved' || kyc.status === 'rejected'
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-green-600 hover:text-green-900'
+                                }`}
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleStatusUpdate(kyc._id, 'rejected')}
+                                disabled={kyc.status === 'approved' || kyc.status === 'rejected'}
+                                className={`${
+                                  kyc.status === 'approved' || kyc.status === 'rejected'
+                                    ? 'text-gray-400 cursor-not-allowed'
+                                    : 'text-red-600 hover:text-red-900'
+                                }`}
+                              >
+                                Reject
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -875,13 +1361,28 @@ const PersonalKYC = () => {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
+          {isAdmin && (
+            <div className="mb-4">
+              <button
+                onClick={() => setCurrentStep(0)}
+                className="flex items-center text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Admin Panel
+              </button>
+            </div>
+          )}
           <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Shield className="w-10 h-10 text-blue-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">KYC Verification</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isAdmin ? 'Submit My KYC' : 'KYC Verification'}
+          </h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Complete your Know Your Customer verification to access all platform features. 
-            Your information is secure and encrypted.
+            {isAdmin 
+              ? 'Submit your own KYC documents for verification.'
+              : 'Complete your Know Your Customer verification to access all platform features. Your information is secure and encrypted.'
+            }
           </p>
         </div>
 
