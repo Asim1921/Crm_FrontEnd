@@ -518,6 +518,41 @@ export const kycAPI = {
     return response.json();
   },
 
+  submitKycJson: async (data) => {
+    console.log('Submitting to:', getApiUrl('/kyc/submit-json'));
+    
+    const headers = {
+      ...getAuthHeaders(),
+      'Content-Type': 'application/json'
+    };
+    
+    console.log('Headers:', headers);
+    console.log('Data being sent:', data);
+    
+    const response = await fetch(getApiUrl('/kyc/submit-json'), {
+      method: 'POST',
+      headers: headers,
+      body: JSON.stringify(data)
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log('Error response:', errorText);
+      let error;
+      try {
+        error = JSON.parse(errorText);
+      } catch (e) {
+        error = { message: errorText };
+      }
+      throw new Error(error.message || 'Failed to submit KYC documents');
+    }
+
+    return response.json();
+  },
+
   getUserKyc: async (userId) => {
     const response = await fetch(getApiUrl(`/kyc/user/${userId}`), {
       headers: getAuthHeaders()

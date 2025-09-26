@@ -1,7 +1,35 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { Upload, FileText, Image, File, Download, Eye, Trash2, User, Calendar, Camera, X, CheckCircle, AlertCircle, FileCheck } from 'lucide-react';
+import { 
+  Upload, 
+  FileText, 
+  Image, 
+  File, 
+  Download, 
+  Eye, 
+  Trash2, 
+  User, 
+  Calendar, 
+  Camera, 
+  X, 
+  CheckCircle, 
+  AlertCircle, 
+  FileCheck,
+  Shield,
+  Building,
+  CreditCard,
+  FileImage,
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Lock,
+  Globe
+} from 'lucide-react';
 import { kycAPI } from '../utils/api';
 
 const PersonalKYC = () => {
@@ -29,6 +57,7 @@ const PersonalKYC = () => {
   const [allKycData, setAllKycData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
 
   // Camera modal state
   const [showCameraModal, setShowCameraModal] = useState(false);
@@ -40,195 +69,512 @@ const PersonalKYC = () => {
 
   // Document types configuration
   const documentTypes = {
-    selfie: { label: 'Selfie', icon: User, accept: 'image/*', required: true },
-    idFront: { label: 'ID Front Side', icon: FileText, accept: 'image/*,application/pdf', required: true },
-    idBack: { label: 'ID Back Side', icon: FileText, accept: 'image/*,application/pdf', required: true },
-    paymentProof: { label: 'Payment Proof', icon: File, accept: 'image/*,application/pdf', required: true },
-    bankStatement: { label: 'Bank Statement', icon: FileText, accept: 'image/*,application/pdf', required: true },
-    utilityBill: { label: 'Utility Bill', icon: FileText, accept: 'image/*,application/pdf', required: true }
+    selfie: { 
+      label: 'Selfie Photo', 
+      icon: User, 
+      accept: 'image/*', 
+      required: true,
+      description: 'Take a clear selfie for identity verification',
+      color: 'blue'
+    },
+    idFront: { 
+      label: 'ID Front Side', 
+      icon: CreditCard, 
+      accept: 'image/*,application/pdf', 
+      required: true,
+      description: 'Upload the front side of your government-issued ID',
+      color: 'green'
+    },
+    idBack: { 
+      label: 'ID Back Side', 
+      icon: CreditCard, 
+      accept: 'image/*,application/pdf', 
+      required: true,
+      description: 'Upload the back side of your government-issued ID',
+      color: 'green'
+    },
+    paymentProof: { 
+      label: 'Payment Proof', 
+      icon: FileCheck, 
+      accept: 'image/*,application/pdf', 
+      required: true,
+      description: 'Upload proof of payment or transaction receipt',
+      color: 'purple'
+    },
+    bankStatement: { 
+      label: 'Bank Statement', 
+      icon: Building, 
+      accept: 'image/*,application/pdf', 
+      required: true,
+      description: 'Upload your recent bank statement',
+      color: 'orange'
+    },
+    utilityBill: { 
+      label: 'Utility Bill', 
+      icon: FileImage, 
+      accept: 'image/*,application/pdf', 
+      required: true,
+      description: 'Upload a recent utility bill for address verification',
+      color: 'red'
+    }
   };
 
-  useEffect(() => {
-    if (isAdmin) {
-      fetchAllKycData();
-    } else {
-      fetchUserKycData();
-    }
-  }, [isAdmin]);
+  const steps = [
+    { id: 1, title: 'Personal Information', description: 'Enter your basic details' },
+    { id: 2, title: 'Identity Documents', description: 'Upload your ID documents' },
+    { id: 3, title: 'Financial Documents', description: 'Upload financial proof' },
+    { id: 4, title: 'Review & Submit', description: 'Review and submit your application' }
+  ];
 
-  // Cleanup camera stream on unmount
-  useEffect(() => {
-    return () => {
+  // Step navigation functions
+  const nextStep = () => {
+    if (currentStep < 4) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1:
+        return formData.fullName && formData.idNumber && formData.country;
+      case 2:
+        return documents.selfie && documents.idFront && documents.idBack;
+      case 3:
+        return documents.paymentProof && documents.bankStatement && documents.utilityBill;
+      default:
+        return true;
+    }
+  };
+
+  const getStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return renderPersonalInfo();
+      case 2:
+        return renderIdentityDocuments();
+      case 3:
+        return renderFinancialDocuments();
+      case 4:
+        return renderReview();
+      default:
+        return renderPersonalInfo();
+    }
+  };
+
+  const renderPersonalInfo = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <User className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Personal Information</h3>
+        <p className="text-gray-600">Please provide your basic personal details</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Full Name <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={formData.fullName}
+              onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              placeholder="Enter your full name"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            ID Number <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              value={formData.idNumber}
+              onChange={(e) => setFormData({...formData, idNumber: e.target.value})}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+              placeholder="Enter your ID number"
+              required
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Country <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <select
+              value={formData.country}
+              onChange={(e) => setFormData({...formData, country: e.target.value})}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none bg-white"
+              required
+            >
+              <option value="">Select your country</option>
+              <option value="US">United States</option>
+              <option value="UK">United Kingdom</option>
+              <option value="CA">Canada</option>
+              <option value="AU">Australia</option>
+              <option value="DE">Germany</option>
+              <option value="FR">France</option>
+              <option value="ES">Spain</option>
+              <option value="IT">Italy</option>
+              <option value="NL">Netherlands</option>
+              <option value="BE">Belgium</option>
+              <option value="CH">Switzerland</option>
+              <option value="AT">Austria</option>
+              <option value="SE">Sweden</option>
+              <option value="NO">Norway</option>
+              <option value="DK">Denmark</option>
+              <option value="FI">Finland</option>
+              <option value="IE">Ireland</option>
+              <option value="PT">Portugal</option>
+              <option value="GR">Greece</option>
+              <option value="PL">Poland</option>
+              <option value="CZ">Czech Republic</option>
+              <option value="HU">Hungary</option>
+              <option value="SK">Slovakia</option>
+              <option value="SI">Slovenia</option>
+              <option value="HR">Croatia</option>
+              <option value="RO">Romania</option>
+              <option value="BG">Bulgaria</option>
+              <option value="LT">Lithuania</option>
+              <option value="LV">Latvia</option>
+              <option value="EE">Estonia</option>
+              <option value="LU">Luxembourg</option>
+              <option value="MT">Malta</option>
+              <option value="CY">Cyprus</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderIdentityDocuments = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Shield className="w-8 h-8 text-green-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Identity Documents</h3>
+        <p className="text-gray-600">Upload your government-issued ID documents</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {['selfie', 'idFront', 'idBack'].map((docType) => (
+          <DocumentUploadCard
+            key={docType}
+            docType={docType}
+            document={documents[docType]}
+            onUpload={handleFileUpload}
+            onRemove={handleRemoveDocument}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderFinancialDocuments = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Building className="w-8 h-8 text-purple-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Financial Documents</h3>
+        <p className="text-gray-600">Upload your financial verification documents</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {['paymentProof', 'bankStatement', 'utilityBill'].map((docType) => (
+          <DocumentUploadCard
+            key={docType}
+            docType={docType}
+            document={documents[docType]}
+            onUpload={handleFileUpload}
+            onRemove={handleRemoveDocument}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderReview = () => (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="w-8 h-8 text-blue-600" />
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">Review & Submit</h3>
+        <p className="text-gray-600">Please review your information before submitting</p>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-6 space-y-6">
+        <div>
+          <h4 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <User className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Full Name</span>
+              </div>
+              <p className="text-gray-900">{formData.fullName || 'Not provided'}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <CreditCard className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">ID Number</span>
+              </div>
+              <p className="text-gray-900">{formData.idNumber || 'Not provided'}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg">
+              <div className="flex items-center space-x-2 mb-2">
+                <MapPin className="w-4 h-4 text-gray-500" />
+                <span className="text-sm font-medium text-gray-700">Country</span>
+              </div>
+              <p className="text-gray-900">{formData.country || 'Not provided'}</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-lg font-medium text-gray-900 mb-4">Documents</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(documents).map(([docType, doc]) => (
+              <div key={docType} className="bg-white p-4 rounded-lg">
+                <div className="flex items-center space-x-2 mb-2">
+                  {React.createElement(documentTypes[docType].icon, { className: "w-4 h-4 text-gray-500" })}
+                  <span className="text-sm font-medium text-gray-700">{documentTypes[docType].label}</span>
+                </div>
+                <div className="flex items-center space-x-2 mb-2">
+                  {doc ? (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-green-600">Uploaded</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-4 h-4 text-red-500" />
+                      <span className="text-sm text-red-600">Missing</span>
+                    </>
+                  )}
+                </div>
+                {doc && (docType === 'selfie' || docType.includes('id') || docType === 'paymentProof') && (
+                  <div className="mt-2">
+                    <img 
+                      src={doc.dataURL || URL.createObjectURL(doc)} 
+                      alt={documentTypes[docType].label}
+                      className="w-full h-20 object-cover rounded border"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const DocumentUploadCard = ({ docType, document, onUpload, onRemove }) => {
+    const config = documentTypes[docType];
+    const Icon = config.icon;
+    const colorClasses = {
+      blue: 'border-blue-200 bg-blue-50 hover:bg-blue-100',
+      green: 'border-green-200 bg-green-50 hover:bg-green-100',
+      purple: 'border-purple-200 bg-purple-50 hover:bg-purple-100',
+      orange: 'border-orange-200 bg-orange-50 hover:bg-orange-100',
+      red: 'border-red-200 bg-red-50 hover:bg-red-100'
+    };
+
+    return (
+      <div className={`border-2 border-dashed rounded-lg p-6 transition-colors ${colorClasses[config.color]}`}>
+        <div className="text-center">
+          <div className={`w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center ${
+            config.color === 'blue' ? 'bg-blue-100' :
+            config.color === 'green' ? 'bg-green-100' :
+            config.color === 'purple' ? 'bg-purple-100' :
+            config.color === 'orange' ? 'bg-orange-100' :
+            'bg-red-100'
+          }`}>
+            <Icon className={`w-6 h-6 ${
+              config.color === 'blue' ? 'text-blue-600' :
+              config.color === 'green' ? 'text-green-600' :
+              config.color === 'purple' ? 'text-purple-600' :
+              config.color === 'orange' ? 'text-orange-600' :
+              'text-red-600'
+            }`} />
+          </div>
+          
+          <h4 className="text-sm font-medium text-gray-900 mb-2">{config.label}</h4>
+          <p className="text-xs text-gray-600 mb-4">{config.description}</p>
+          
+          {document ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-center space-x-2 text-green-600">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">Document Uploaded</span>
+              </div>
+              <button
+                onClick={() => onRemove(docType)}
+                className="text-red-600 hover:text-red-800 text-sm font-medium"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {docType === 'selfie' ? (
+                <>
+                  <button
+                    onClick={() => setShowCameraModal(true)}
+                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Camera className="w-4 h-4 inline mr-2" />
+                    Take Photo
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCameraModal(true);
+                      setTimeout(() => startCamera(), 200);
+                    }}
+                    className="w-full bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                  >
+                    <Camera className="w-4 h-4 inline mr-2" />
+                    Open Camera
+                  </button>
+                </>
+              ) : null}
+              
+              <input
+                type="file"
+                accept={config.accept}
+                onChange={(e) => onUpload(docType, e.target.files[0])}
+                className="hidden"
+                id={`file-${docType}`}
+              />
+              <label
+                htmlFor={`file-${docType}`}
+                className="w-full bg-white border border-gray-300 rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer inline-block text-center"
+              >
+                <Upload className="w-4 h-4 inline mr-2" />
+                Choose File
+              </label>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Camera functionality
+  const startCamera = async () => {
+    try {
+      setCameraLoading(true);
+      console.log('Starting camera...');
+      
+      // Stop any existing stream first
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
       }
-    };
-  }, [cameraStream]);
-
-  const fetchUserKycData = async () => {
-    try {
-      setLoading(true);
-      const data = await kycAPI.getUserKyc(user._id);
-      // Don't pre-fill the form - let users start fresh each time
-      // Only show existing data in admin view
+      
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera not supported on this device');
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'user',
+          width: { ideal: 1280, min: 640 },
+          height: { ideal: 720, min: 480 }
+        },
+        audio: false
+      });
+      
+      console.log('Camera stream obtained:', stream);
+      setCameraStream(stream);
+      
+      // Set loading to false immediately after getting stream
+      setCameraLoading(false);
+      
+      if (videoRef.current) {
+        console.log('Setting video srcObject...');
+        videoRef.current.srcObject = stream;
+        
+        // Simple play attempt
+        setTimeout(() => {
+          if (videoRef.current) {
+            console.log('Attempting to play video...');
+            videoRef.current.play().catch(console.error);
+          }
+        }, 100);
+      }
     } catch (error) {
-      console.error('Error fetching user KYC data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error accessing camera:', error);
+      let errorMessage = 'Camera access denied. Please allow camera permission.';
+      
+      if (error.name === 'NotAllowedError') {
+        errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+      } else if (error.name === 'NotFoundError') {
+        errorMessage = 'No camera found on this device.';
+      } else if (error.name === 'NotSupportedError') {
+        errorMessage = 'Camera not supported on this device.';
+      }
+      
+      showToast(errorMessage, 'error');
+      setCameraLoading(false);
     }
   };
 
-  const fetchAllKycData = async () => {
-    try {
-      setLoading(true);
-      const data = await kycAPI.getAllKyc();
-      setAllKycData(data);
-    } catch (error) {
-      console.error('Error fetching all KYC data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInputChange = (name, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFileUpload = (documentType, file) => {
-    if (file) {
-      setDocuments(prev => ({
-        ...prev,
-        [documentType]: file
-      }));
-    }
-  };
-
-  // Camera functions
-  const openCameraModal = () => {
-    setShowCameraModal(true);
-    setCapturedImage(null);
-  };
-
-  const closeCameraModal = () => {
-    setShowCameraModal(false);
-    setCameraLoading(false);
+  const stopCamera = () => {
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
   };
 
-  const startCamera = async () => {
-    try {
-      setCameraLoading(true);
-      console.log('Requesting camera access...');
-      
-      // Check if getUserMedia is supported
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera not supported in this browser');
-      }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: 'user', // Front camera for selfies
-          width: { ideal: 640 },
-          height: { ideal: 480 }
-        } 
-      });
-      
-      console.log('Camera stream obtained:', stream);
-      setCameraStream(stream);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        
-        // Set up event listeners before trying to play
-        const video = videoRef.current;
-        
-        const handleLoadedMetadata = () => {
-          console.log('Video metadata loaded, starting playback...');
-          video.play()
-            .then(() => {
-              console.log('Video started playing');
-              setCameraLoading(false);
-            })
-            .catch((playError) => {
-              console.error('Error playing video:', playError);
-              setCameraLoading(false);
-            });
-        };
-        
-        const handleCanPlay = () => {
-          console.log('Video can play');
-          setCameraLoading(false);
-        };
-        
-        // Add event listeners
-        video.addEventListener('loadedmetadata', handleLoadedMetadata);
-        video.addEventListener('canplay', handleCanPlay);
-        
-        // Try to play immediately
-        video.play().catch((playError) => {
-          console.log('Immediate play failed, waiting for metadata...', playError);
-        });
-        
-        // Fallback timeout
-        setTimeout(() => {
-          if (cameraLoading) {
-            console.log('Timeout reached, forcing camera to show');
-            setCameraLoading(false);
-          }
-        }, 3000);
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      setCameraLoading(false);
-      let errorMessage = 'Unable to access camera. Please check permissions.';
-      
-      if (error.name === 'NotAllowedError') {
-        errorMessage = 'Camera access denied. Please allow camera permissions and try again.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = 'No camera found. Please connect a camera or use gallery option.';
-      } else if (error.name === 'NotReadableError') {
-        errorMessage = 'Camera is already in use by another application.';
-      } else if (error.message === 'Camera not supported in this browser') {
-        errorMessage = 'Camera not supported in this browser. Please use a modern browser.';
-      }
-      
-      showToast(errorMessage, 'error');
-    }
-  };
-
   const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    
+    if (video && canvas) {
       const context = canvas.getContext('2d');
-      
-      // Set canvas dimensions to match video
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
-      // Draw the video frame to canvas (mirrored for selfie)
       context.save();
-      context.scale(-1, 1); // Mirror horizontally
+      context.scale(-1, 1);
       context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
       context.restore();
       
-      // Convert canvas to data URL
       const dataURL = canvas.toDataURL('image/jpeg', 0.9);
       
-      // Create a file-like object without using File constructor
       const file = {
         name: 'selfie.jpg',
         type: 'image/jpeg',
         size: dataURL.length,
         lastModified: Date.now(),
-        dataURL: dataURL, // Store the data URL for later use
-        // Add methods that might be needed
+        dataURL: dataURL,
         stream: function() {
           const byteString = atob(dataURL.split(',')[1]);
           const ab = new ArrayBuffer(byteString.length);
@@ -251,38 +597,36 @@ const PersonalKYC = () => {
       
       setCapturedImage(file);
       handleFileUpload('selfie', file);
-      console.log('Photo captured successfully:', file);
-    } else {
-      console.error('Video or canvas not available');
-      showToast('Camera not ready for capture', 'error');
+      showToast('Photo captured successfully!', 'success');
     }
   };
 
-  const selectFromGallery = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        setCapturedImage(file);
-        handleFileUpload('selfie', file);
-        closeCameraModal();
-      }
-    };
-    input.click();
+  const handleFileUpload = (docType, file) => {
+    if (!file) return;
+    
+    setDocuments(prev => ({
+      ...prev,
+      [docType]: file
+    }));
+    
+    showToast(`${documentTypes[docType].label} uploaded successfully!`, 'success');
   };
 
-  // Helper function to convert file to base64
+  const handleRemoveDocument = (docType) => {
+    setDocuments(prev => ({
+      ...prev,
+      [docType]: null
+    }));
+    showToast(`${documentTypes[docType].label} removed`, 'success');
+  };
+
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
-      // If it's our custom file object with dataURL, use it directly
       if (file.dataURL) {
         resolve(file.dataURL);
         return;
       }
       
-      // Otherwise, use FileReader for regular files
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => resolve(reader.result);
@@ -290,18 +634,16 @@ const PersonalKYC = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate required fields
     if (!formData.fullName || !formData.idNumber || !formData.country) {
       showToast('Please fill in all required fields', 'error');
       return;
     }
 
-    // Validate required documents
-    const requiredDocs = Object.keys(documentTypes).filter(key => documentTypes[key].required);
-    const missingDocs = requiredDocs.filter(docType => !documents[docType]);
+    const requiredDocs = ['selfie', 'idFront', 'idBack', 'paymentProof', 'bankStatement', 'utilityBill'];
+    const missingDocs = requiredDocs.filter(doc => !documents[doc]);
     
     if (missingDocs.length > 0) {
       showToast(`Please upload all required documents: ${missingDocs.map(doc => documentTypes[doc].label).join(', ')}`, 'error');
@@ -311,51 +653,32 @@ const PersonalKYC = () => {
     try {
       setUploading(true);
       
-      // Convert files to base64
-      const documentsBase64 = {};
+      // Prepare documents object
+      const documentsData = {};
       for (const [docType, file] of Object.entries(documents)) {
         if (file) {
-          documentsBase64[docType] = await fileToBase64(file);
+          const base64 = await fileToBase64(file);
+          documentsData[docType] = base64;
+          console.log(`Added ${docType} document to request`);
         }
       }
-
-      // Create JSON payload
-      const payload = {
+      
+      const requestData = {
         fullName: formData.fullName,
         idNumber: formData.idNumber,
         country: formData.country,
-        userId: user._id,
-        documents: documentsBase64
+        documents: documentsData
       };
-
-      console.log('About to submit KYC with payload:', payload);
       
-      // Use a simple JSON POST instead of FormData
-      const response = await fetch('/api/kyc/submit-json', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(payload)
+      console.log('Request data being sent:', {
+        fullName: requestData.fullName,
+        idNumber: requestData.idNumber,
+        country: requestData.country,
+        documentsCount: Object.keys(requestData.documents).length
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to submit KYC documents');
-      }
-
-      const result = await response.json();
-      const isUpdate = response.status === 200;
       
-      showToast(isUpdate ? 'Documents Updated Successfully' : 'Documents Submitted Successfully', 'success');
-      
-      // Refresh data
-      if (isAdmin) {
-        fetchAllKycData();
-      } else {
-        fetchUserKycData();
-      }
+      await kycAPI.submitKycJson(requestData);
+      showToast('KYC documents submitted successfully!', 'success');
       
       // Reset form
       setFormData({ fullName: '', idNumber: '', country: '' });
@@ -367,131 +690,172 @@ const PersonalKYC = () => {
         bankStatement: null,
         utilityBill: null
       });
+      setCurrentStep(1);
+      
     } catch (error) {
       console.error('Error submitting KYC:', error);
-      showToast('Error submitting KYC documents', 'error');
+      showToast('Failed to submit KYC documents. Please try again.', 'error');
     } finally {
       setUploading(false);
     }
   };
 
-  const handleDownload = async (kycId, documentType) => {
+  // Admin view functions
+  const fetchAllKycData = async () => {
     try {
-      await kycAPI.downloadDocument(kycId, documentType);
+      setLoading(true);
+      const data = await kycAPI.getAllKyc();
+      setAllKycData(data);
     } catch (error) {
-      console.error('Error downloading document:', error);
-      showToast('Error downloading document', 'error');
+      console.error('Error fetching KYC data:', error);
+      showToast('Failed to fetch KYC data', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleDelete = async (kycId) => {
+  const handleDownloadDocument = async (kycId, documentType, fileName) => {
+    try {
+      await kycAPI.downloadDocument(kycId, documentType, fileName);
+      showToast('Document downloaded successfully!', 'success');
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      showToast('Failed to download document', 'error');
+    }
+  };
+
+  const handleDeleteKyc = async (kycId) => {
     if (window.confirm('Are you sure you want to delete this KYC submission?')) {
       try {
         await kycAPI.deleteKyc(kycId);
-        showToast('KYC submission deleted successfully', 'success');
+        showToast('KYC submission deleted successfully!', 'success');
         fetchAllKycData();
       } catch (error) {
         console.error('Error deleting KYC:', error);
-        showToast('Error deleting KYC submission', 'error');
+        showToast('Failed to delete KYC submission', 'error');
       }
     }
   };
 
-  // Admin view - show all KYC submissions
+  const handleStatusUpdate = async (kycId, status) => {
+    try {
+      await kycAPI.updateKycStatus(kycId, status);
+      showToast(`KYC status updated to ${status}`, 'success');
+      fetchAllKycData();
+    } catch (error) {
+      console.error('Error updating status:', error);
+      showToast('Failed to update status', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchAllKycData();
+    }
+  }, [isAdmin]);
+
+  // Start camera when modal opens
+  useEffect(() => {
+    if (showCameraModal) {
+      // Small delay to ensure modal is fully rendered
+      setTimeout(() => {
+        startCamera();
+      }, 100);
+    } else {
+      stopCamera();
+    }
+  }, [showCameraModal]);
+
+  // Ensure video element is properly configured when camera stream changes
+  useEffect(() => {
+    if (cameraStream && videoRef.current) {
+      console.log('Camera stream changed, reconfiguring video element...');
+      videoRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream]);
+
   if (isAdmin) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20">
-            <div className="px-8 py-6 border-b border-gray-100">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-100 rounded-xl">
-                  <FileText className="h-6 w-6 text-blue-600" />
-                </div>
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">KYC Management</h1>
-                  <p className="mt-1 text-gray-600">View and manage all KYC submissions</p>
+                  <h1 className="text-2xl font-bold text-gray-900">KYC Management</h1>
+                  <p className="text-gray-600 mt-1">Review and manage KYC submissions</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm text-gray-600">System Active</span>
                 </div>
               </div>
             </div>
-            
-            <div className="p-8">
+
+            <div className="p-6">
               {loading ? (
-                <div className="flex justify-center items-center py-20">
-                  <div className="relative">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600"></div>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-xl border border-gray-200">
+                <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+                    <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">User</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ID Number</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Country</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Submitted On</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Documents</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Number</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
+                    <tbody className="bg-white divide-y divide-gray-200">
                       {allKycData.map((kyc) => (
-                        <tr key={kyc._id} className="hover:bg-blue-50/50 transition-colors">
+                        <tr key={kyc._id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-3">
-                              <div className="p-2 bg-blue-100 rounded-lg">
-                                <User className="h-4 w-4 text-blue-600" />
+                            <div className="flex items-center">
+                              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <User className="w-4 h-4 text-blue-600" />
                               </div>
-                              <div className="text-sm font-semibold text-gray-900">{kyc.fullName}</div>
+                              <div className="ml-3">
+                                <div className="text-sm font-medium text-gray-900">{kyc.fullName}</div>
+                              </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">{kyc.idNumber}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{kyc.country}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{kyc.idNumber}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{kyc.country}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                              kyc.status === 'approved' ? 'bg-green-100 text-green-800 border border-green-200' :
-                              kyc.status === 'rejected' ? 'bg-red-100 text-red-800 border border-red-200' :
-                              'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              kyc.status === 'approved' ? 'bg-green-100 text-green-800' :
+                              kyc.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
                             }`}>
-                              {kyc.status === 'approved' && <CheckCircle className="h-3 w-3 mr-1" />}
-                              {kyc.status === 'rejected' && <AlertCircle className="h-3 w-3 mr-1" />}
                               {kyc.status}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {new Date(kyc.submittedAt).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                            <div className="flex flex-wrap gap-1">
-                              {Object.keys(kyc.documents || {}).map(docType => (
-                                <span key={docType} className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
-                                  {documentTypes[docType]?.label || docType}
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <div className="flex space-x-2">
-                              <button
-                                onClick={() => handleDownload(kyc._id, 'selfie')}
-                                className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
-                                title="Download Documents"
-                              >
-                                <Download className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(kyc._id)}
-                                className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded-lg transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                            <button
+                              onClick={() => handleStatusUpdate(kyc._id, 'approved')}
+                              className="text-green-600 hover:text-green-900"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleStatusUpdate(kyc._id, 'rejected')}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Reject
+                            </button>
+                            <button
+                              onClick={() => handleDeleteKyc(kyc._id)}
+                              className="text-red-600 hover:text-red-900"
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -506,394 +870,237 @@ const PersonalKYC = () => {
     );
   }
 
-  // Client view - KYC form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl mb-4">
-            <FileCheck className="h-8 w-8 text-white" />
+          <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-10 h-10 text-blue-600" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
-            Personal KYC
-          </h1>
-          <p className="text-gray-600 text-lg">Submit your documents for verification</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">KYC Verification</h1>
+          <p className="text-gray-600 max-w-2xl mx-auto">
+            Complete your Know Your Customer verification to access all platform features. 
+            Your information is secure and encrypted.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Personal Information Card */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 p-8">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-blue-100 rounded-xl">
-                <User className="h-6 w-6 text-blue-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">Personal Information</h2>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Full Name *</label>
-                <input
-                  type="text"
-                  value={formData.fullName}
-                  onChange={(e) => handleInputChange('fullName', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">ID Number *</label>
-                <input
-                  type="text"
-                  value={formData.idNumber}
-                  onChange={(e) => handleInputChange('idNumber', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
-                  placeholder="Enter your ID number"
-                  required
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label className="block text-sm font-semibold text-gray-700">Country *</label>
-                <input
-                  type="text"
-                  value={formData.country}
-                  onChange={(e) => handleInputChange('country', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white/50"
-                  placeholder="Enter your country"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Document Upload Card */}
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 p-8">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-indigo-100 rounded-xl">
-                <Upload className="h-6 w-6 text-indigo-600" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900">Document Upload</h2>
-            </div>
-            
-            {/* Selfie Section */}
-            <div className="mb-8">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Camera className="h-5 w-5 text-green-600" />
+        {/* Progress Steps */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            {steps.map((step, index) => (
+              <div key={step.id} className="flex items-center">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                  currentStep >= step.id 
+                    ? 'bg-blue-600 border-blue-600 text-white' 
+                    : 'bg-white border-gray-300 text-gray-500'
+                }`}>
+                  {currentStep > step.id ? (
+                    <Check className="w-5 h-5" />
+                  ) : (
+                    <span className="text-sm font-medium">{step.id}</span>
+                  )}
                 </div>
-                <label className="text-lg font-semibold text-gray-700">Selfie *</label>
-              </div>
-              <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 bg-gradient-to-r from-green-50 to-blue-50">
-                {!documents.selfie ? (
-                  <div className="text-center">
-                    <button
-                      type="button"
-                      onClick={openCameraModal}
-                      className="bg-gradient-to-r from-green-500 to-blue-500 text-white px-6 py-3 rounded-xl hover:from-green-600 hover:to-blue-600 flex items-center gap-3 mx-auto transition-all duration-200 shadow-lg hover:shadow-xl"
-                    >
-                      <Camera className="h-5 w-5" />
-                      Take Selfie
-                    </button>
-                    <p className="text-gray-600 mt-3">Click to take a selfie or select from gallery</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between bg-white rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-green-100 rounded-lg">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">{documents.selfie.name}</p>
-                        <p className="text-sm text-gray-500">Photo uploaded successfully</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={openCameraModal}
-                      className="text-blue-600 hover:text-blue-800 font-medium transition-colors"
-                    >
-                      Retake
-                    </button>
-                  </div>
+                <div className="ml-3 hidden sm:block">
+                  <p className={`text-sm font-medium ${
+                    currentStep >= step.id ? 'text-blue-600' : 'text-gray-500'
+                  }`}>
+                    {step.title}
+                  </p>
+                  <p className="text-xs text-gray-500">{step.description}</p>
+                </div>
+                {index < steps.length - 1 && (
+                  <div className={`hidden sm:block w-16 h-0.5 mx-4 ${
+                    currentStep > step.id ? 'bg-blue-600' : 'bg-gray-300'
+                  }`} />
                 )}
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
 
-            {/* ID Documents Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <label className="text-lg font-semibold text-gray-700">ID Front Side *</label>
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 bg-white/50">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileUpload('idFront', e.target.files[0])}
-                    className="w-full"
-                  />
-                  {documents.idFront && (
-                    <div className="mt-3 flex items-center gap-3 bg-green-50 rounded-lg p-3">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">{documents.idFront.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <label className="text-lg font-semibold text-gray-700">ID Back Side *</label>
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 bg-white/50">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileUpload('idBack', e.target.files[0])}
-                    className="w-full"
-                  />
-                  {documents.idBack && (
-                    <div className="mt-3 flex items-center gap-3 bg-green-50 rounded-lg p-3">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">{documents.idBack.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Additional Documents Section */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <File className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <label className="text-lg font-semibold text-gray-700">Payment Proof</label>
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 bg-white/50">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileUpload('paymentProof', e.target.files[0])}
-                    className="w-full"
-                  />
-                  {documents.paymentProof && (
-                    <div className="mt-3 flex items-center gap-3 bg-green-50 rounded-lg p-3">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">{documents.paymentProof.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <label className="text-lg font-semibold text-gray-700">Bank Statement</label>
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 bg-white/50">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileUpload('bankStatement', e.target.files[0])}
-                    className="w-full"
-                  />
-                  {documents.bankStatement && (
-                    <div className="mt-3 flex items-center gap-3 bg-green-50 rounded-lg p-3">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">{documents.bankStatement.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-teal-100 rounded-lg">
-                    <FileText className="h-5 w-5 text-teal-600" />
-                  </div>
-                  <label className="text-lg font-semibold text-gray-700">Utility Bill</label>
-                </div>
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 bg-white/50">
-                  <input
-                    type="file"
-                    accept="image/*,application/pdf"
-                    onChange={(e) => handleFileUpload('utilityBill', e.target.files[0])}
-                    className="w-full"
-                  />
-                  {documents.utilityBill && (
-                    <div className="mt-3 flex items-center gap-3 bg-green-50 rounded-lg p-3">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-medium text-green-800">{documents.utilityBill.name}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+        {/* Main Form */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="p-6 sm:p-8">
+            {getStepContent()}
           </div>
 
-          {/* Submit Button */}
-          <div className="flex justify-center">
+          {/* Navigation */}
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
             <button
-              type="submit"
-              disabled={uploading}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-8 py-4 rounded-2xl hover:from-blue-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3 text-lg font-semibold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              type="button"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              className="flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {uploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Submitting...
-                </>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Previous
+            </button>
+
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">
+                Step {currentStep} of {steps.length}
+              </span>
+            </div>
+
+            {currentStep < 4 ? (
+              <button
+                type="button"
+                onClick={nextStep}
+                disabled={!canProceed()}
+                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleFormSubmit}
+                disabled={uploading || !canProceed()}
+                className="flex items-center px-6 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Submit KYC
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Camera Modal */}
+      {showCameraModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Take Selfie</h3>
+              <button 
+                onClick={() => {
+                  setShowCameraModal(false);
+                  stopCamera();
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="relative bg-gray-100 rounded-lg overflow-hidden mb-4" style={{ aspectRatio: '4/3' }}>
+              {cameraLoading ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
+                  <p className="text-sm text-gray-600 mb-4">Starting camera...</p>
+                  <button
+                    onClick={startCamera}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : !cameraStream ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <Camera className="w-12 h-12 text-gray-400 mb-4" />
+                  <p className="text-sm text-gray-600 mb-4">Camera not started</p>
+                  <button
+                    onClick={startCamera}
+                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    Start Camera
+                  </button>
+                </div>
               ) : (
                 <>
-                  <Upload className="h-5 w-5" />
-                  Submit KYC Documents
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                    style={{ 
+                      width: '100%', 
+                      height: '100%', 
+                      objectFit: 'cover',
+                      transform: 'scaleX(-1)'
+                    }}
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="absolute top-2 right-2">
+                    <button
+                      onClick={() => {
+                        console.log('Manual camera restart');
+                        startCamera();
+                      }}
+                      className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
+                    >
+                      Restart
+                    </button>
+                  </div>
                 </>
               )}
-            </button>
-          </div>
-        </form>
-
-        {/* Camera Modal */}
-        {showCameraModal && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border border-white/20">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900">Take Selfie</h3>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowCameraModal(false);
+                  stopCamera();
+                }}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              {!cameraLoading && !cameraStream && (
                 <button
-                  onClick={closeCameraModal}
-                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+                  onClick={startCamera}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
                 >
-                  <X className="h-6 w-6" />
+                  Try Camera Again
                 </button>
-              </div>
-
-              <div className="space-y-6">
-                {!cameraStream ? (
-                  <div className="text-center space-y-6">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl p-8">
-                      <Camera className="h-20 w-20 text-blue-400 mx-auto mb-6" />
-                      <p className="text-gray-700 mb-6 text-lg">Choose how you want to add your selfie:</p>
-                      <div className="space-y-3">
-                        <button
-                          onClick={startCamera}
-                          className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl hover:from-blue-600 hover:to-indigo-700 flex items-center justify-center gap-3 transition-all duration-200 shadow-lg hover:shadow-xl"
-                        >
-                          <Camera className="h-5 w-5" />
-                          Use Camera
-                        </button>
-                        <button
-                          onClick={selectFromGallery}
-                          className="w-full bg-gray-600 text-white py-3 px-6 rounded-xl hover:bg-gray-700 flex items-center justify-center gap-3 transition-all duration-200 shadow-lg hover:shadow-xl"
-                        >
-                          <Image className="h-5 w-5" />
-                          Choose from Gallery
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="relative bg-black rounded-2xl overflow-hidden shadow-2xl">
-                      <video
-                        ref={videoRef}
-                        autoPlay
-                        playsInline
-                        muted
-                        className="w-full h-64 object-cover"
-                        style={{ transform: 'scaleX(-1)' }} // Mirror the video for selfie
-                      />
-                      {cameraLoading && (
-                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                          <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-4 border-white border-t-transparent mx-auto mb-4"></div>
-                            <p className="text-white mb-4">Starting camera...</p>
-                            <button
-                              onClick={() => {
-                                setCameraLoading(false);
-                                setTimeout(() => startCamera(), 100);
-                              }}
-                              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                            >
-                              Try Again
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      <canvas
-                        ref={canvasRef}
-                        className="hidden"
-                      />
-                    </div>
-                    
-                    <div className="flex gap-3">
-                      <button
-                        onClick={capturePhoto}
-                        disabled={cameraLoading || !cameraStream}
-                        className="flex-1 bg-gradient-to-r from-green-500 to-emerald-600 text-white py-3 px-6 rounded-xl hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        <Camera className="h-5 w-5" />
-                        {cameraLoading ? 'Loading...' : cameraStream ? 'Capture Photo' : 'Camera Not Ready'}
-                      </button>
-                      <button
-                        onClick={selectFromGallery}
-                        className="flex-1 bg-gray-600 text-white py-3 px-6 rounded-xl hover:bg-gray-700 flex items-center justify-center gap-3 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        <Image className="h-5 w-5" />
-                        Gallery
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {capturedImage && (
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <p className="text-green-600 font-semibold mb-4 text-lg">Photo captured successfully!</p>
-                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl p-6">
-                        <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-3" />
-                        <p className="text-sm text-gray-700 font-medium">{capturedImage.name}</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={closeCameraModal}
-                        className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3 px-6 rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        Use This Photo
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCapturedImage(null);
-                          if (cameraStream) {
-                            startCamera();
-                          }
-                        }}
-                        className="flex-1 bg-gray-600 text-white py-3 px-6 rounded-xl hover:bg-gray-700 transition-all duration-200 shadow-lg hover:shadow-xl"
-                      >
-                        Retake
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
+              {cameraStream && (
+                <button
+                  onClick={() => {
+                    console.log('Manual play button clicked');
+                    if (videoRef.current) {
+                      console.log('Video element:', videoRef.current);
+                      console.log('Video paused:', videoRef.current.paused);
+                      console.log('Video readyState:', videoRef.current.readyState);
+                      videoRef.current.play().then(() => {
+                        console.log('Manual play successful');
+                      }).catch((error) => {
+                        console.error('Manual play failed:', error);
+                      });
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 text-sm font-medium text-green-600 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                >
+                  Force Play
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  capturePhoto();
+                  setShowCameraModal(false);
+                  stopCamera();
+                }}
+                disabled={cameraLoading || !cameraStream}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                Capture Photo
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
