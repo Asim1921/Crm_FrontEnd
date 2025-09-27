@@ -42,15 +42,18 @@ const ClientManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [campaignFilter, setCampaignFilter] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
   const [agentFilter, setAgentFilter] = useState('all');
   const [unassignedFilter, setUnassignedFilter] = useState(false);
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [selectAll, setSelectAll] = useState(false);
   const [showStatusFilter, setShowStatusFilter] = useState(false);
+  const [showCampaignFilter, setShowCampaignFilter] = useState(false);
   const [duplicateFilter, setDuplicateFilter] = useState(false);
   const [assignToAgent, setAssignToAgent] = useState('');
   const statusFilterRef = useRef(null);
+  const campaignFilterRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -59,7 +62,7 @@ const ClientManagement = () => {
     hasPrev: false
   });
   const [analytics, setAnalytics] = useState({
-    clientsByCountry: [],
+    clientsByCampaign: [],
     leadStatusOverview: [],
     totalClients: 0
   });
@@ -145,6 +148,27 @@ const ClientManagement = () => {
         return 'bg-purple-100 text-purple-800';
       case 'Wrong Number':
         return 'bg-red-100 text-red-800';
+      case 'Wrong Name':
+        return 'bg-amber-100 text-amber-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getCampaignColor = (campaign) => {
+    switch (campaign) {
+      case 'Data':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'Data2':
+        return 'bg-purple-100 text-purple-800';
+      case 'Data3':
+        return 'bg-pink-100 text-pink-800';
+      case 'Data4':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'Data5':
+        return 'bg-orange-100 text-orange-800';
+      case 'Affiliate':
+        return 'bg-teal-100 text-teal-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -165,9 +189,8 @@ const ClientManagement = () => {
     try {
       const params = {
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-        ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
-        ...(statusFilter === 'Data' && { campaign: 'Data' }),
-        ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
         ...(countryFilter !== 'all' && { country: countryFilter }),
         ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
         // Date filtering based on type
@@ -198,9 +221,8 @@ const ClientManagement = () => {
         page: duplicateFilter ? 1 : currentPage,
         limit: duplicateFilter ? 1000 : 50, // Fetch all clients for duplicate detection
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-        ...(statusFilter !== 'all' && statusFilter !== 'Data' && statusFilter !== 'Affiliate' && { status: statusFilter }),
-        ...(statusFilter === 'Data' && { campaign: 'Data' }),
-        ...(statusFilter === 'Affiliate' && { campaign: 'Affiliate' }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
         ...(countryFilter !== 'all' && { country: countryFilter }),
         // For agents, automatically filter to only their assigned clients
         ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
@@ -248,12 +270,12 @@ const ClientManagement = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, debouncedSearchTerm, statusFilter, countryFilter, agentFilter, unassignedFilter, duplicateFilter, dateFilter, endDateFilter, dateNavigationType]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, duplicateFilter, dateFilter, endDateFilter, dateNavigationType]);
 
   // Fetch global analytics whenever filters change (but not pagination)
   useEffect(() => {
     fetchGlobalAnalytics();
-  }, [debouncedSearchTerm, statusFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType]);
+  }, [debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType]);
 
   // Fetch available agents and countries
   useEffect(() => {
@@ -279,6 +301,9 @@ const ClientManagement = () => {
       if (statusFilterRef.current && !statusFilterRef.current.contains(event.target)) {
         setShowStatusFilter(false);
       }
+      if (campaignFilterRef.current && !campaignFilterRef.current.contains(event.target)) {
+        setShowCampaignFilter(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -299,14 +324,20 @@ const ClientManagement = () => {
     setCurrentPage(1);
   };
 
+  // Handle campaign filter
+  const handleCampaignFilter = (campaign) => {
+    setCampaignFilter(campaign);
+    setCurrentPage(1);
+  };
+
   // Handle lead status overview clicks
   const handleLeadStatusClick = (status) => {
     setStatusFilter(status);
     setCurrentPage(1);
   };
 
-  // Handle right-click on client name
-  const handleClientNameContextMenu = (e, clientId) => {
+  // Handle left-click on client name
+  const handleClientNameClick = (e, clientId) => {
     e.preventDefault();
     setContextMenu({
       show: true,
@@ -340,6 +371,16 @@ const ClientManagement = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [contextMenu.show]);
+
+  // Auto-refresh comments every 2 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing comments...');
+      fetchData();
+    }, 2 * 60 * 1000); // 2 minutes in milliseconds
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Handle select all checkbox
   const handleSelectAll = (checked) => {
@@ -614,8 +655,8 @@ const ClientManagement = () => {
          return;
        }
 
-       // Expected headers in order: name, email, number/phone, country
-       const expectedHeaders = ['name', 'email', 'number', 'country'];
+       // Expected headers in order: name, email, number/phone, country, campaign
+       const expectedHeaders = ['name', 'email', 'number', 'country', 'campaign'];
        const actualHeaders = lines[0].split(',').map(h => h.trim().replace(/"/g, '').toLowerCase());
        
        // Validate headers
@@ -652,7 +693,7 @@ const ClientManagement = () => {
             phone: values[2] || '', // number or phone column
             country: values[3] || '',
             status: 'New Lead', // Default status
-            campaign: 'Data' // Default campaign
+            campaign: values[4] || 'Data' // campaign column, default to 'Data' if empty
           };
         }).filter(client => {
           // Validate required fields
@@ -817,14 +858,14 @@ const ClientManagement = () => {
 
   // Calculate dynamic analytics from current clients (which are already filtered by the API)
   const calculateDynamicAnalytics = () => {
-    // Calculate clients by country from current clients
-    const countryCounts = {};
+    // Calculate clients by campaign from current clients
+    const campaignCounts = {};
     const statusCounts = {};
     
     clients.forEach(client => {
-      // Count by country
-      const country = client.country || 'Unknown';
-      countryCounts[country] = (countryCounts[country] || 0) + 1;
+      // Count by campaign
+      const campaign = client.campaign || 'Data';
+      campaignCounts[campaign] = (campaignCounts[campaign] || 0) + 1;
       
       // Count by status
       const status = client.status || 'Unknown';
@@ -832,8 +873,8 @@ const ClientManagement = () => {
     });
     
     // Convert to arrays for charts
-    const clientsByCountry = Object.entries(countryCounts).map(([country, count]) => ({
-      _id: country,
+    const clientsByCampaign = Object.entries(campaignCounts).map(([campaign, count]) => ({
+      _id: campaign,
       count: count
     }));
     
@@ -843,7 +884,7 @@ const ClientManagement = () => {
     }));
     
     return {
-      clientsByCountry,
+      clientsByCampaign,
       leadStatusOverview,
       totalClients: clients.length
     };
@@ -852,10 +893,10 @@ const ClientManagement = () => {
   const dynamicAnalytics = calculateDynamicAnalytics();
 
   // Transform analytics data for charts
-  const pieChartData = dynamicAnalytics.clientsByCountry.map((item, index) => ({
+  const pieChartData = dynamicAnalytics.clientsByCampaign.map((item, index) => ({
     name: item._id,
     value: item.count,
-    color: ['#60A5FA', '#34D399', '#FBBF24', '#F87171', '#A78BFA', '#FB7185'][index % 6]
+    color: ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#EF4444', '#10B981'][index % 6]
   }));
 
 
@@ -1083,6 +1124,18 @@ const ClientManagement = () => {
                      </button>
                      <button
                        onClick={() => {
+                         setStatusFilter('New Lead');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'New Lead' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       New Lead
+                     </button>
+                     <button
+                       onClick={() => {
                          setStatusFilter('Call Again');
                          setShowStatusFilter(false);
                          setCurrentPage(1);
@@ -1155,6 +1208,18 @@ const ClientManagement = () => {
                      </button>
                      <button
                        onClick={() => {
+                         setStatusFilter('Wrong Name');
+                         setShowStatusFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         statusFilter === 'Wrong Name' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Wrong Name
+                     </button>
+                     <button
+                       onClick={() => {
                          setStatusFilter('FTD');
                          setShowStatusFilter(false);
                          setCurrentPage(1);
@@ -1182,6 +1247,113 @@ const ClientManagement = () => {
                )}
              </div>
              
+             {/* Campaign Filter Button */}
+             <div className="relative" ref={campaignFilterRef}>
+               <button 
+                 onClick={() => setShowCampaignFilter(!showCampaignFilter)}
+                 className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+                   campaignFilter !== 'all' 
+                     ? 'bg-red-600 hover:bg-red-700' 
+                     : 'bg-gray-600 hover:bg-gray-700'
+                 }`}
+               >
+                 <Filter className="w-4 h-4" />
+                 <span>Campaign</span>
+               </button>
+               
+               {/* Campaign Filter Dropdown */}
+               {showCampaignFilter && (
+                 <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                   <div className="py-1">
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('all');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       All Campaigns
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Data');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Data' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Data
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Data2');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Data2' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Data2
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Data3');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Data3' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Data3
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Data4');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Data4' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Data4
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Data5');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Data5' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Data5
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Affiliate');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Affiliate' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Affiliate
+                     </button>
+                   </div>
+                 </div>
+               )}
+             </div>
+             
              <button 
                onClick={() => {
                  fetchBulkCampaignClients();
@@ -1190,7 +1362,7 @@ const ClientManagement = () => {
                className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-1"
              >
                <Users className="w-4 h-4" />
-               <span>Campaign</span>
+               <span>Bulk Update</span>
              </button>
              <button 
                onClick={() => {
@@ -1254,8 +1426,112 @@ const ClientManagement = () => {
         
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
+          {/* Top Pagination */}
+          <div className="px-4 lg:px-6 py-3 border-b border-gray-200 bg-white">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
+              <div className="text-xs lg:text-sm text-gray-700 text-center sm:text-left">
+                {(!pagination.totalClients || pagination.totalClients === 0) ? (
+                  <span>No customers found</span>
+                ) : pagination.totalClients === 1 ? (
+                  <span>1 customer</span>
+                ) : (
+                  <span>
+                    {pagination.current} of {pagination.total} pages • {pagination.totalClients} customer{pagination.totalClients !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-center space-x-1 lg:space-x-2">
+                {/* First Page Button */}
+                {pagination.current > 3 && (
+                  <>
+                    <button 
+                      onClick={() => setCurrentPage(1)}
+                      className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      1
+                    </button>
+                    {pagination.current > 4 && (
+                      <span className="px-1 text-gray-400">...</span>
+                    )}
+                  </>
+                )}
+
+                {/* Previous Button */}
+                <button 
+                  onClick={() => setCurrentPage(pagination.current - 1)}
+                  disabled={!pagination.hasPrev}
+                  className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+
+                {/* Dynamic Page Numbers */}
+                {(() => {
+                  const current = pagination.current;
+                  const total = pagination.total;
+                  const pages = [];
+                  
+                  // Calculate start and end page numbers
+                  let startPage = Math.max(1, current - 2);
+                  let endPage = Math.min(total, current + 2);
+                  
+                  // Adjust if we're near the beginning or end
+                  if (current <= 3) {
+                    endPage = Math.min(total, 5);
+                  }
+                  if (current >= total - 2) {
+                    startPage = Math.max(1, total - 4);
+                  }
+                  
+                  // Generate page numbers
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button 
+                        key={i}
+                        onClick={() => setCurrentPage(i)}
+                        className={`px-2 lg:px-3 py-1 text-xs lg:text-sm rounded ${
+                          i === current 
+                            ? 'bg-blue-600 text-white' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+                  
+                  return pages;
+                })()}
+
+                {/* Next Button */}
+                <button 
+                  onClick={() => setCurrentPage(pagination.current + 1)}
+                  disabled={!pagination.hasNext}
+                  className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+
+                {/* Last Page Button */}
+                {pagination.current < pagination.total - 2 && (
+                  <>
+                    {pagination.current < pagination.total - 3 && (
+                      <span className="px-1 text-gray-400">...</span>
+                    )}
+                    <button 
+                      onClick={() => setCurrentPage(pagination.total)}
+                      className="px-2 lg:px-3 py-1 text-xs lg:text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      {pagination.total}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto" style={{ direction: 'rtl' }}>
+            <table className="w-full min-w-[800px]" style={{ direction: 'ltr' }}>
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 lg:px-6 py-3 text-left">
@@ -1285,6 +1561,7 @@ const ClientManagement = () => {
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
                   )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CAMPAIGN</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center justify-between">
                       <span>CRM ENTRY DATE</span>
@@ -1327,7 +1604,6 @@ const ClientManagement = () => {
                       </div>
                     </div>
                   </th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1349,8 +1625,7 @@ const ClientManagement = () => {
                           </div>
                           <div className="ml-2 lg:ml-3">
                             <button
-                              onClick={() => navigate(`/clients/${client._id}`)}
-                              onContextMenu={(e) => handleClientNameContextMenu(e, client._id)}
+                              onClick={(e) => handleClientNameClick(e, client._id)}
                               className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
                             >
                               {client.firstName}
@@ -1390,6 +1665,11 @@ const ClientManagement = () => {
                          {client.status}
                        </span>
                      </td>
+                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCampaignColor(client.campaign)}`}>
+                         {client.campaign || 'Data'}
+                       </span>
+                     </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                        {client.createdAt ? new Date(client.createdAt).toLocaleDateString() : 'N/A'}
                      </td>
@@ -1400,32 +1680,13 @@ const ClientManagement = () => {
                              {client.lastComment}
                            </div>
                            <div className="text-xs text-gray-500">
-                             {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleDateString() : 'No date'}
+                             {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleString() : 'No date'}
                            </div>
                          </div>
                        ) : (
                          <span className="text-gray-400">No comments</span>
                        )}
                      </td>
-                     <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button 
-                          onClick={() => handleCall(client)}
-                          className="text-gray-400 hover:text-blue-600 transition-colors"
-                          title="Call client"
-                        >
-                          <Phone className="w-4 h-4" />
-                        </button>
-
-                        <button 
-                          onClick={() => handleEmail(client)}
-                          className="text-gray-400 hover:text-orange-600 transition-colors"
-                          title="Send email"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1553,9 +1814,9 @@ const ClientManagement = () => {
              </div>
            </div>
                    
-                   {/* Clients by Country */}
+                   {/* Clients by Campaign Status */}
            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
-             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Country</h3>
+             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Campaign Status</h3>
              <div className="h-48 lg:h-64">
               {pieChartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
@@ -1643,6 +1904,7 @@ const ClientManagement = () => {
                      status._id === 'Not Interested' ? 'bg-gray-500' :
                      status._id === 'Hang Up' ? 'bg-purple-500' :
                      status._id === 'Wrong Number' ? 'bg-red-500' :
+                     status._id === 'Wrong Name' ? 'bg-amber-500' :
                      'bg-gray-400'
                    }`}></div>
                    <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
@@ -1766,6 +2028,7 @@ const ClientManagement = () => {
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
                   <option value="Wrong Number">Wrong Number</option>
+                  <option value="Wrong Name">Wrong Name</option>
                 </select>
               </div>
               <div>
@@ -1819,13 +2082,14 @@ const ClientManagement = () => {
                 />
               </div>
                              <p className="text-sm text-gray-600">
-                 Upload a CSV file with exactly 4 columns in this order: name, email, number/phone, country
+                 Upload a CSV file with exactly 5 columns in this order: name, email, number/phone, country, campaign
                </p>
                <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded">
                  <p className="font-medium mb-1">CSV Format Example:</p>
-                 <p>name,email,number,country</p>
-                 <p>John Doe,john@example.com,+1234567890,United States</p>
-                 <p>Jane Smith,jane@example.com,+0987654321,Canada</p>
+                 <p>name,email,number,country,campaign</p>
+                 <p>John Doe,john@example.com,+1234567890,United States,Data</p>
+                 <p>Jane Smith,jane@example.com,+0987654321,Canada,Data2</p>
+                 <p>Mike Johnson,mike@example.com,+1122334455,UK,Affiliate</p>
                </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">
@@ -2239,6 +2503,7 @@ const ClientManagement = () => {
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
                   <option value="Wrong Number">Wrong Number</option>
+                  <option value="Wrong Name">Wrong Name</option>
                 </select>
               </div>
               <div>

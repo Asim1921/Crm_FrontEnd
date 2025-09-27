@@ -43,6 +43,7 @@ const ClientProfile = () => {
   const [showEditTaskModal, setShowEditTaskModal] = useState(false);
   const [showBulkCampaignModal, setShowBulkCampaignModal] = useState(false);
   const [newNote, setNewNote] = useState('');
+  const [noteStatus, setNoteStatus] = useState('');
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -161,12 +162,19 @@ const ClientProfile = () => {
     }
 
     try {
+      // If status is selected, update client status first
+      if (noteStatus && noteStatus !== client.status) {
+        await clientAPI.updateClient(id, { status: noteStatus });
+        setClient(prev => ({ ...prev, status: noteStatus }));
+      }
+
       const updatedClient = await clientAPI.addNote(id, newNote);
       setClient(updatedClient);
       // Sort notes by creation date (newest first)
       const sortedNotes = (updatedClient.notes || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setNotes(sortedNotes);
       setNewNote('');
+      setNoteStatus('');
       setShowAddNoteModal(false);
       
       alert('Note added successfully!');
@@ -969,6 +977,27 @@ const ClientProfile = () => {
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   rows={4}
                 />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Update Status (Optional)</label>
+                <select
+                  value={noteStatus}
+                  onChange={(e) => setNoteStatus(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">Keep current status ({client?.status || 'Unknown'})</option>
+                  <option value="New Lead">New Lead</option>
+                  <option value="FTD">FTD</option>
+                  <option value="FTD RETENTION">FTD RETENTION</option>
+                  <option value="Call Again">Call Again</option>
+                  <option value="No Answer">No Answer</option>
+                  <option value="NA5UP">NA5UP</option>
+                  <option value="Not Interested">Not Interested</option>
+                  <option value="Hang Up">Hang Up</option>
+                  <option value="Wrong Number">Wrong Number</option>
+                  <option value="Wrong Name">Wrong Name</option>
+                </select>
               </div>
             </div>
 

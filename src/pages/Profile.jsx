@@ -388,13 +388,15 @@ const Profile = () => {
         <div className="bg-white rounded-xl p-4 lg:p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-3 sm:space-y-0">
             <h3 className="text-base lg:text-lg font-semibold text-gray-900">Personal Information</h3>
-            <button
-              onClick={() => setIsEditing(!isEditing)}
-              className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              <Edit className="w-4 h-4" />
-              <span className="text-sm lg:text-base">{isEditing ? 'Cancel' : 'Edit'}</span>
-            </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="flex items-center space-x-2 text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                <Edit className="w-4 h-4" />
+                <span className="text-sm lg:text-base">{isEditing ? 'Cancel' : 'Edit'}</span>
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
@@ -405,7 +407,7 @@ const Profile = () => {
                 name="firstName"
                 value={profileData.firstName}
                 onChange={handleChange}
-                disabled={!isEditing}
+                disabled={!isEditing || user?.role !== 'admin'}
                 className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
               />
             </div>
@@ -417,7 +419,7 @@ const Profile = () => {
                 name="lastName"
                 value={profileData.lastName}
                 onChange={handleChange}
-                disabled={!isEditing}
+                disabled={!isEditing || user?.role !== 'admin'}
                 className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
               />
             </div>
@@ -429,7 +431,7 @@ const Profile = () => {
                 name="email"
                 value={profileData.email}
                 onChange={handleChange}
-                disabled={!isEditing}
+                disabled={!isEditing || user?.role !== 'admin'}
                 className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
               />
             </div>
@@ -441,7 +443,7 @@ const Profile = () => {
                 name="phone"
                 value={profileData.phone}
                 onChange={handleChange}
-                disabled={!isEditing}
+                disabled={!isEditing || user?.role !== 'admin'}
                 className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
               />
             </div>
@@ -452,7 +454,7 @@ const Profile = () => {
                 name="bio"
                 value={profileData.bio}
                 onChange={handleChange}
-                disabled={!isEditing}
+                disabled={!isEditing || user?.role !== 'admin'}
                 rows={4}
                 className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 resize-none"
               />
@@ -466,7 +468,7 @@ const Profile = () => {
                   name="campaign"
                   value={profileData.campaign}
                   onChange={handleChange}
-                  disabled={!isEditing}
+                  disabled={!isEditing || user?.role !== 'admin'}
                   className="w-full px-3 lg:px-4 py-2 text-sm lg:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50"
                 >
                   <option value="Data">Data</option>
@@ -476,7 +478,7 @@ const Profile = () => {
             )}
           </div>
 
-          {isEditing && (
+          {isEditing && user?.role === 'admin' && (
             <div className="mt-4 lg:mt-6 flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
               <button
                 onClick={handleSave}
