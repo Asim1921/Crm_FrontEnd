@@ -22,7 +22,7 @@ import {
   MicOff,
   PhoneOff
 } from 'lucide-react';
-import { communicationAPI, clientAPI, click2CallAPI, callStatsAPI } from '../utils/api';
+import { communicationAPI, clientAPI, click2CallAPI, amiClick2CallAPI, callStatsAPI } from '../utils/api';
 import BrowserCallInterface from '../components/BrowserCallInterface';
 
 
@@ -74,6 +74,11 @@ const CommunicationsHub = () => {
   const [isOnHold, setIsOnHold] = useState(false);
   const [serviceInfo, setServiceInfo] = useState(null);
   const click2CallRef = useRef(null);
+  
+  // AMI Click2Call states
+  const [amiStatus, setAmiStatus] = useState('disconnected');
+  const [amiServiceInfo, setAmiServiceInfo] = useState(null);
+  const [useAmiIntegration, setUseAmiIntegration] = useState(true); // Toggle between AMI and external service
   
   // Browser-based voice call states
   const [browserDevice, setBrowserDevice] = useState(null);
@@ -155,7 +160,27 @@ Best regards,
     agent: false
   });
 
-  // Click2Call VoIP functions
+  // AMI Click2Call functions
+  const initializeAmiClick2Call = async () => {
+    try {
+      console.log('Initializing AMI Click2Call service...');
+      const statusResult = await amiClick2CallAPI.getStatus();
+      if (statusResult.success) {
+        setAmiStatus('connected');
+        setAmiServiceInfo(statusResult);
+        console.log('AMI Click2Call connected successfully:', statusResult);
+      } else {
+        setAmiStatus('error');
+        console.error('AMI Click2Call connection failed:', statusResult.error);
+      }
+    } catch (error) {
+      console.error('Error initializing AMI Click2Call:', error);
+      setAmiStatus('error');
+      console.log('AMI Click2Call service may be unavailable, but system will continue to work');
+    }
+  };
+
+  // Click2Call VoIP functions (External Service)
   const initializeClick2Call = async () => {
     try {
       console.log('Initializing Click2Call service...');
@@ -177,6 +202,63 @@ Best regards,
     }
   };
 
+  // AMI Click2Call initiation function
+  const initiateAmiCall = async (phoneNumber, clientId) => {
+    try {
+      // Validate and format phone number
+      const validatedNumber = validatePhoneNumber(phoneNumber);
+      if (!validatedNumber) {
+        showToast('Invalid phone number format. Please enter a valid number.', 'error');
+        return;
+      }
+
+      setAmiStatus('connecting');
+      
+      // Make the call using AMI Click2Call API
+      const callResult = await amiClick2CallAPI.makeCall({
+        phoneNumber: validatedNumber,
+        context: 'click to call',
+        ringtime: '30',
+        CallerID: 'Anonymous',
+        name: 'CRM User',
+        other: `Client ID: ${clientId}`
+      });
+      
+      if (callResult.success) {
+        setCurrentCall({
+          number: validatedNumber,
+          startTime: new Date(),
+          status: 'connecting',
+          callId: callResult.callId,
+          click2CallStatus: callResult.status,
+          communicationId: callResult.communicationId,
+          isAmiCall: true,
+          method: 'AMI'
+        });
+        
+        setAmiStatus('connected');
+        
+        // Add notification
+        addCallNotification(
+          formatPhoneNumber(validatedNumber),
+          'Client',
+          callResult.communicationId
+        );
+        
+        // Show success toast message
+        showToast('AMI Call Initiated - Asterisk will call your extension first', 'success');
+      } else {
+        setAmiStatus('error');
+        showToast(`AMI Call Failed: ${callResult.message || callResult.error}`, 'error');
+      }
+    } catch (error) {
+      console.error('Error initiating AMI call:', error);
+      setAmiStatus('error');
+      showToast('Failed to initiate AMI call. Please check your Asterisk configuration.', 'error');
+    }
+  };
+
+  // External Click2Call initiation function
   const initiateClick2Call = async (phoneNumber, clientId) => {
     try {
       // Validate and format phone number
@@ -420,6 +502,7 @@ Best regards,
     fetchData();
     fetchCallStats();
     initializeClick2Call();
+    initializeAmiClick2Call();
   }, []);
 
   const handleCall = async (channel = 'voip') => {
@@ -639,9 +722,13 @@ Best regards,
       const selectedClient = clients.find(c => c._id === callData.clientId);
       const clientName = selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : 'Unknown Client';
       
-      // Use Click2Call for VoIP calls
+      // Use AMI Click2Call for VoIP calls (preferred) or fallback to external service
       if (callData.channel === 'voip') {
-        await initiateClick2Call(callData.phoneNumber, callData.clientId);
+        if (useAmiIntegration && amiStatus === 'connected') {
+          await initiateAmiCall(callData.phoneNumber, callData.clientId);
+        } else {
+          await initiateClick2Call(callData.phoneNumber, callData.clientId);
+        }
       } else {
         // Fallback to regular phone call
         window.open(`tel:${callData.phoneNumber}`, '_self');
@@ -1004,43 +1091,93 @@ Copy this message and paste it in the chat:
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 lg:mb-6 space-y-2 sm:space-y-0">
               <div>
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900">VoIP Integration</h3>
-                <p className="text-xs lg:text-sm text-gray-600">Click2Call VoIP System</p>
+                <p className="text-xs lg:text-sm text-gray-600">
+                  {useAmiIntegration ? 'AMI Click2Call System' : 'External Click2Call System'}
+                </p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                click2CallStatus === 'connected' ? 'bg-green-100 text-green-800' :
-                click2CallStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {click2CallStatus === 'connected' ? 'Connected' :
-                 click2CallStatus === 'connecting' ? 'Connecting' :
-                 click2CallStatus === 'error' ? 'Error' : 'Disconnected'}
-              </span>
+              <div className="flex items-center space-x-2">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  useAmiIntegration ? (
+                    amiStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                    amiStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  ) : (
+                    click2CallStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                    click2CallStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  )
+                }`}>
+                  {useAmiIntegration ? (
+                    amiStatus === 'connected' ? 'AMI Connected' :
+                    amiStatus === 'connecting' ? 'AMI Connecting' :
+                    amiStatus === 'error' ? 'AMI Error' : 'AMI Disconnected'
+                  ) : (
+                    click2CallStatus === 'connected' ? 'External Connected' :
+                    click2CallStatus === 'connecting' ? 'External Connecting' :
+                    click2CallStatus === 'error' ? 'External Error' : 'External Disconnected'
+                  )}
+                </span>
+                <button
+                  onClick={() => setUseAmiIntegration(!useAmiIntegration)}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                  title={`Switch to ${useAmiIntegration ? 'External' : 'AMI'} service`}
+                >
+                  {useAmiIntegration ? 'Use External' : 'Use AMI'}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4">
-              {/* Click2Call Status */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
-                <div className="flex items-center space-x-3">
-                  <Phone className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
-                  <div>
-                    <span className="text-sm lg:text-base font-medium text-gray-900">Click2Call VoIP</span>
-                    <p className="text-xs text-gray-600">
-                      {click2CallStatus === 'connected' ? 'Service Connected' :
-                       click2CallStatus === 'connecting' ? 'Connecting to Click2Call' :
-                       click2CallStatus === 'error' ? 'Connection Error' : 'Disconnected'}
-                    </p>
-                    {serviceInfo && (
-                      <p className="text-xs text-green-600">
-                        Service: {serviceInfo.serviceName || 'Click2Call'}
+              {/* AMI Click2Call Status */}
+              {useAmiIntegration && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
+                  <div className="flex items-center space-x-3">
+                    <Phone className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
+                    <div>
+                      <span className="text-sm lg:text-base font-medium text-gray-900">AMI Click2Call</span>
+                      <p className="text-xs text-gray-600">
+                        {amiStatus === 'connected' ? 'AMI Service Connected' :
+                         amiStatus === 'connecting' ? 'Connecting to Asterisk AMI' :
+                         amiStatus === 'error' ? 'AMI Connection Error' : 'AMI Disconnected'}
                       </p>
-                    )}
+                      {amiServiceInfo && (
+                        <p className="text-xs text-green-600">
+                          Service: {amiServiceInfo.serviceName || 'AMI Click2Call'} | 
+                          Extension: {amiServiceInfo.user?.extension || 'Not set'}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
+              )}
+
+              {/* External Click2Call Status */}
+              {!useAmiIntegration && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 lg:p-4 bg-gray-50 rounded-lg space-y-3 sm:space-y-0">
+                  <div className="flex items-center space-x-3">
+                    <Phone className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600" />
+                    <div>
+                      <span className="text-sm lg:text-base font-medium text-gray-900">External Click2Call</span>
+                      <p className="text-xs text-gray-600">
+                        {click2CallStatus === 'connected' ? 'Service Connected' :
+                         click2CallStatus === 'connecting' ? 'Connecting to Click2Call' :
+                         click2CallStatus === 'error' ? 'Connection Error' : 'Disconnected'}
+                      </p>
+                      {serviceInfo && (
+                        <p className="text-xs text-green-600">
+                          Service: {serviceInfo.serviceName || 'Click2Call'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
                 <div className="flex flex-col sm:flex-row gap-2">
                   <button 
                     onClick={() => handleCall('voip')}
-                    disabled={click2CallStatus === 'error'}
+                    disabled={useAmiIntegration ? amiStatus === 'error' : click2CallStatus === 'error'}
                     className="bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    title={useAmiIntegration ? 'Make call using AMI (Asterisk will call your extension first)' : 'Make call using external Click2Call service'}
                   >
                     <Phone className="w-4 h-4" />
                     <span>Call</span>
@@ -1162,18 +1299,28 @@ Copy this message and paste it in the chat:
                 <div className="flex items-start space-x-3">
                   <Info className="w-4 h-4 lg:w-5 lg:h-5 text-blue-600 mt-0.5" />
                   <div className="text-xs lg:text-sm text-blue-800">
-                    <p className="font-medium mb-1">Click2Call VoIP Integration</p>
-                    <p>
-                      {click2CallStatus === 'connected' ? 
-                        'Full API integration available. Calls will be made through Click2Call service.' :
-                       click2CallStatus === 'connecting' ? 
-                        'Connecting to Click2Call...' :
-                       'Click2Call integration not available. Check configuration.'}
+                    <p className="font-medium mb-1">
+                      {useAmiIntegration ? 'AMI Click2Call Integration' : 'External Click2Call Integration'}
                     </p>
-                    {click2CallStatus === 'error' && (
+                    <p>
+                      {useAmiIntegration ? (
+                        amiStatus === 'connected' ? 
+                          'AMI integration available. Calls will be made through your Asterisk PBX system.' :
+                         amiStatus === 'connecting' ? 
+                          'Connecting to Asterisk AMI...' :
+                         'AMI integration not available. Check Asterisk configuration.'
+                      ) : (
+                        click2CallStatus === 'connected' ? 
+                          'External service integration available. Calls will be made through Click2Call service.' :
+                         click2CallStatus === 'connecting' ? 
+                          'Connecting to external Click2Call...' :
+                         'External Click2Call integration not available. Check configuration.'
+                      )}
+                    </p>
+                    {(useAmiIntegration ? amiStatus === 'error' : click2CallStatus === 'error') && (
                       <div className="mt-2 space-x-2">
                         <button 
-                          onClick={() => initializeClick2Call()}
+                          onClick={() => useAmiIntegration ? initializeAmiClick2Call() : initializeClick2Call()}
                           className="text-green-600 hover:text-green-800 font-medium text-xs"
                         >
                           🔄 Retry Connection
@@ -1181,25 +1328,30 @@ Copy this message and paste it in the chat:
                         <button 
                           onClick={async () => {
                             try {
-                              const result = await click2CallAPI.testCall();
-                              console.log('Test call result:', result);
-                              showToast(`Test Call: ${result.success ? 'Success' : 'Failed'}`, result.success ? 'success' : 'error');
+                              const result = useAmiIntegration ? 
+                                await amiClick2CallAPI.testConnection() : 
+                                await click2CallAPI.testCall();
+                              console.log('Test result:', result);
+                              showToast(`Test ${useAmiIntegration ? 'AMI Connection' : 'Call'}: ${result.success ? 'Success' : 'Failed'}`, result.success ? 'success' : 'error');
                             } catch (error) {
-                              console.error('Test call error:', error);
-                              showToast(`Test Call Error: ${error.message}`, 'error');
+                              console.error('Test error:', error);
+                              showToast(`Test Error: ${error.message}`, 'error');
                             }
                           }}
                           className="text-purple-600 hover:text-purple-800 font-medium text-xs"
                         >
-                          🧪 Test Call
+                          🧪 {useAmiIntegration ? 'Test AMI' : 'Test Call'}
                         </button>
                         <button 
                           onClick={async () => {
                             try {
-                              const result = await click2CallAPI.getUserInfo();
+                              const result = useAmiIntegration ? 
+                                await amiClick2CallAPI.getUserInfo() : 
+                                await click2CallAPI.getUserInfo();
                               console.log('User info result:', result);
                               if (result.success) {
-                                showToast(`User Extension: ${result.user.extension || 'Not set'}`, 'info');
+                                const extension = useAmiIntegration ? result.user?.extension : result.user?.extension;
+                                showToast(`User Extension: ${extension || 'Not set'}`, 'info');
                               } else {
                                 showToast(`User Info Error: ${result.error}`, 'error');
                               }
@@ -1212,61 +1364,64 @@ Copy this message and paste it in the chat:
                         >
                           👤 Check User
                         </button>
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const result = await click2CallAPI.simpleServiceTest();
-                              console.log('Simple service test result:', result);
-                              if (result.success) {
-                                showToast('Service Test: Success', 'success');
-                              } else {
-                                showToast(`Service Test Failed: ${result.error}`, 'error');
+                        {!useAmiIntegration && (
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const result = await click2CallAPI.simpleServiceTest();
+                                console.log('Simple service test result:', result);
+                                if (result.success) {
+                                  showToast('Service Test: Success', 'success');
+                                } else {
+                                  showToast(`Service Test Failed: ${result.error}`, 'error');
+                                }
+                              } catch (error) {
+                                console.error('Simple service test error:', error);
+                                showToast(`Service Test Error: ${error.message}`, 'error');
                               }
-                            } catch (error) {
-                              console.error('Simple service test error:', error);
-                              showToast(`Service Test Error: ${error.message}`, 'error');
-                            }
-                          }}
-                          className="text-green-600 hover:text-green-800 font-medium text-xs"
-                        >
-                          🌐 Service Test
-                        </button>
-                        <button 
-                          onClick={async () => {
-                            try {
-                              const result = await click2CallAPI.directApiTest();
-                              console.log('Direct API test result:', result);
-                              if (result.success) {
-                                showToast('Direct API Test: Success', 'success');
-                              } else {
-                                showToast(`Direct API Test Failed: ${result.error}`, 'error');
+                            }}
+                            className="text-green-600 hover:text-green-800 font-medium text-xs"
+                          >
+                            🌐 Service Test
+                          </button>
+                        )}
+                        {!useAmiIntegration && (
+                          <button 
+                            onClick={async () => {
+                              try {
+                                const result = await click2CallAPI.directApiTest();
+                                console.log('Direct API test result:', result);
+                                if (result.success) {
+                                  showToast('Direct API Test: Success', 'success');
+                                } else {
+                                  showToast(`Direct API Test Failed: ${result.error}`, 'error');
+                                }
+                              } catch (error) {
+                                console.error('Direct API test error:', error);
+                                showToast(`Direct API Test Error: ${error.message}`, 'error');
                               }
-                            } catch (error) {
-                              console.error('Direct API test error:', error);
-                              showToast(`Direct API Test Error: ${error.message}`, 'error');
-                            }
-                          }}
-                          className="text-orange-600 hover:text-orange-800 font-medium text-xs"
-                        >
-                          🔧 Direct API Test
-                        </button>
+                            }}
+                            className="text-orange-600 hover:text-orange-800 font-medium text-xs"
+                          >
+                            🔧 Direct API Test
+                          </button>
+                        )}
                         <button 
                           onClick={() => setShowTwilioGuideModal(true)}
                           className="text-blue-600 hover:text-blue-800 font-medium text-xs"
                         >
-                          View Integration Guide →
+                          View {useAmiIntegration ? 'AMI' : 'Integration'} Guide →
                         </button>
                       </div>
                     )}
-                    {click2CallStatus === 'connected' && (
+                    {(useAmiIntegration ? amiStatus === 'connected' : click2CallStatus === 'connected') && (
                 <button 
                         onClick={() => setShowTwilioGuideModal(true)}
                         className="mt-2 text-blue-600 hover:text-blue-800 font-medium text-xs"
                 >
-                        View Service Info →
+                        View {useAmiIntegration ? 'AMI' : 'Service'} Info →
                 </button>
                     )}
-              </div>
               </div>
             </div>
           </div>
@@ -1859,7 +2014,9 @@ Copy this message and paste it in the chat:
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-4 lg:p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Click2Call VoIP Integration Guide</h3>
+                <h3 className="text-lg font-semibold">
+                  {useAmiIntegration ? 'AMI Click2Call Integration Guide' : 'Click2Call VoIP Integration Guide'}
+                </h3>
                 <button onClick={() => setShowTwilioGuideModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="w-5 h-5" />
                 </button>
@@ -1867,52 +2024,94 @@ Copy this message and paste it in the chat:
               
               <div className="space-y-6">
                 <div className="bg-blue-50 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">What is Click2Call?</h4>
+                  <h4 className="font-medium text-blue-900 mb-2">
+                    {useAmiIntegration ? 'What is AMI Click2Call?' : 'What is Click2Call?'}
+                  </h4>
                   <p className="text-sm text-blue-800">
-                    Click2Call is a VoIP service that enables you to make calls through your existing phone system. 
-                    It connects your CRM to your PBX system for seamless calling functionality.
+                    {useAmiIntegration ? 
+                      'AMI Click2Call is a direct integration with your Asterisk PBX system using the Asterisk Manager Interface (AMI). It enables you to make calls directly through your own PBX infrastructure without external dependencies.' :
+                      'Click2Call is a VoIP service that enables you to make calls through your existing phone system. It connects your CRM to your PBX system for seamless calling functionality.'
+                    }
                   </p>
                 </div>
 
                 <div className="bg-yellow-50 rounded-lg p-4">
                   <h4 className="font-medium text-yellow-900 mb-2">How It Works:</h4>
                   <ul className="text-sm text-yellow-800 space-y-1">
-                    <li>• When you make a call, Click2Call will call your extension first</li>
-                    <li>• Once you answer, Click2Call will connect you to the target number</li>
-                    <li>• All calls are made through your existing PBX system</li>
-                    <li>• Call quality and reliability are managed by your PBX</li>
-                    <li>• No additional software installation required</li>
+                    {useAmiIntegration ? (
+                      <>
+                        <li>• When you make a call, the Python AMI script connects to Asterisk</li>
+                        <li>• Asterisk calls your extension first using your configured extension</li>
+                        <li>• Once you answer, Asterisk connects you to the target number</li>
+                        <li>• All calls are made directly through your Asterisk PBX system</li>
+                        <li>• Call quality and reliability are managed by your Asterisk server</li>
+                        <li>• No external service dependencies - uses your own infrastructure</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>• When you make a call, Click2Call will call your extension first</li>
+                        <li>• Once you answer, Click2Call will connect you to the target number</li>
+                        <li>• All calls are made through your existing PBX system</li>
+                        <li>• Call quality and reliability are managed by your PBX</li>
+                        <li>• No additional software installation required</li>
+                      </>
+                    )}
                   </ul>
                 </div>
 
                 <div className="bg-green-50 rounded-lg p-4">
                   <h4 className="font-medium text-green-900 mb-2">Benefits:</h4>
                   <ul className="text-sm text-green-800 space-y-1">
-                    <li>• Professional call quality through your PBX</li>
-                    <li>• No software installation required</li>
-                    <li>• Integration with existing phone system</li>
-                    <li>• Cost-effective calling solution</li>
-                    <li>• Reliable PBX infrastructure</li>
-                    <li>• Detailed call logs and reporting</li>
+                    {useAmiIntegration ? (
+                      <>
+                        <li>• Direct control over your Asterisk PBX system</li>
+                        <li>• No external service dependencies or fees</li>
+                        <li>• Full integration with your existing Asterisk infrastructure</li>
+                        <li>• Complete call control and customization</li>
+                        <li>• Enhanced security - all calls stay within your network</li>
+                        <li>• Cost-effective - uses your existing PBX investment</li>
+                        <li>• Detailed call logs and reporting through Asterisk</li>
+                      </>
+                    ) : (
+                      <>
+                        <li>• Professional call quality through your PBX</li>
+                        <li>• No software installation required</li>
+                        <li>• Integration with existing phone system</li>
+                        <li>• Cost-effective calling solution</li>
+                        <li>• Reliable PBX infrastructure</li>
+                        <li>• Detailed call logs and reporting</li>
+                      </>
+                    )}
                   </ul>
                 </div>
 
                 <div className="bg-blue-50 rounded-lg p-4">
                   <h4 className="font-medium text-blue-900 mb-2">Testing:</h4>
                   <p className="text-sm text-blue-800">
-                    To test the integration, try making a call to any phone number. 
-                    Click2Call will first call your extension, then connect you to the target.
+                    {useAmiIntegration ? 
+                      'To test the AMI integration, try making a call to any phone number. Asterisk will first call your extension, then connect you to the target. Make sure your Asterisk server is running and AMI is properly configured.' :
+                      'To test the integration, try making a call to any phone number. Click2Call will first call your extension, then connect you to the target.'
+                    }
                   </p>
                 </div>
               </div>
               
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
-                <button 
-                  onClick={() => window.open('https://pbx07.t-lan.co:3000', '_blank')}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                >
-                  Visit Click2Call Service
-                </button>
+                {useAmiIntegration ? (
+                  <button 
+                    onClick={() => window.open('/ami-test', '_blank')}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    Test AMI Integration
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => window.open('https://pbx07.t-lan.co:3000', '_blank')}
+                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    Visit Click2Call Service
+                  </button>
+                )}
                 <button 
                   onClick={() => setShowTwilioGuideModal(false)}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"

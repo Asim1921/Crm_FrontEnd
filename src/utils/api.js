@@ -340,7 +340,59 @@ export const communicationAPI = {
   }
 };
 
-// CLICK2CALL API calls
+// AMI CLICK2CALL API calls (Python AMI Integration)
+export const amiClick2CallAPI = {
+  // Make a call using AMI
+  makeCall: async (callData) => {
+    try {
+      const response = await apiRequest('/ami-click2call/call', {
+        method: 'POST',
+        body: JSON.stringify(callData)
+      });
+      return response;
+    } catch (error) {
+      console.error('AMI Click2Call error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Test AMI connection
+  testConnection: async () => {
+    try {
+      const response = await apiRequest('/ami-click2call/test-connection', {
+        method: 'POST'
+      });
+      return response;
+    } catch (error) {
+      console.error('AMI connection test error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Get AMI service status
+  getStatus: async () => {
+    try {
+      const response = await apiRequest('/ami-click2call/status');
+      return response;
+    } catch (error) {
+      console.error('AMI status error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Get user info for AMI debugging
+  getUserInfo: async () => {
+    try {
+      const response = await apiRequest('/ami-click2call/user-info');
+      return response;
+    } catch (error) {
+      console.error('AMI user info error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+};
+
+// CLICK2CALL API calls (External Service)
 export const click2CallAPI = {
   // Initialize Click2Call service
   initialize: async () => {
@@ -688,6 +740,7 @@ export default {
   communications: communicationAPI,
   callStats: callStatsAPI,
   click2Call: click2CallAPI,
+  amiClick2Call: amiClick2CallAPI,
   twilio: twilioAPI,
   kyc: kycAPI
 };
