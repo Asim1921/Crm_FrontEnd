@@ -399,6 +399,41 @@ export const click2CallAPI = {
       console.error('Click2Call test call error:', error);
       return { success: false, error: error.message };
     }
+  },
+
+  // Get user info (for debugging)
+  getUserInfo: async () => {
+    try {
+      const response = await apiRequest('/click2call/user-info');
+      return response;
+    } catch (error) {
+      console.error('Click2Call user info error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Direct API test (for debugging)
+  directApiTest: async () => {
+    try {
+      const response = await apiRequest('/click2call/direct-test', {
+        method: 'POST'
+      });
+      return response;
+    } catch (error) {
+      console.error('Click2Call direct API test error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Simple service test (for debugging)
+  simpleServiceTest: async () => {
+    try {
+      const response = await apiRequest('/click2call/simple-test');
+      return response;
+    } catch (error) {
+      console.error('Click2Call simple service test error:', error);
+      return { success: false, error: error.message };
+    }
   }
 };
 

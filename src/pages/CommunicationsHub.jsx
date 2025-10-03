@@ -203,11 +203,10 @@ Best regards,
       const callResult = await click2CallAPI.makeCall({
         clientId: clientId,
         phoneNumber: validatedNumber,
-        extension: '1000', // Default extension from Click2Call config
-        context: 'clicktocall',
+        context: 'click to call',
         ringtime: '30',
-        CallerID: 'CRM System',
-        nombre: 'CRM User',
+        CallerID: 'Anonymous',
+        name: 'CRM User',
         other: `Client ID: ${clientId}`
       });
       
@@ -1193,6 +1192,63 @@ Copy this message and paste it in the chat:
                           className="text-purple-600 hover:text-purple-800 font-medium text-xs"
                         >
                           🧪 Test Call
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const result = await click2CallAPI.getUserInfo();
+                              console.log('User info result:', result);
+                              if (result.success) {
+                                showToast(`User Extension: ${result.user.extension || 'Not set'}`, 'info');
+                              } else {
+                                showToast(`User Info Error: ${result.error}`, 'error');
+                              }
+                            } catch (error) {
+                              console.error('User info error:', error);
+                              showToast(`User Info Error: ${error.message}`, 'error');
+                            }
+                          }}
+                          className="text-blue-600 hover:text-blue-800 font-medium text-xs"
+                        >
+                          👤 Check User
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const result = await click2CallAPI.simpleServiceTest();
+                              console.log('Simple service test result:', result);
+                              if (result.success) {
+                                showToast('Service Test: Success', 'success');
+                              } else {
+                                showToast(`Service Test Failed: ${result.error}`, 'error');
+                              }
+                            } catch (error) {
+                              console.error('Simple service test error:', error);
+                              showToast(`Service Test Error: ${error.message}`, 'error');
+                            }
+                          }}
+                          className="text-green-600 hover:text-green-800 font-medium text-xs"
+                        >
+                          🌐 Service Test
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              const result = await click2CallAPI.directApiTest();
+                              console.log('Direct API test result:', result);
+                              if (result.success) {
+                                showToast('Direct API Test: Success', 'success');
+                              } else {
+                                showToast(`Direct API Test Failed: ${result.error}`, 'error');
+                              }
+                            } catch (error) {
+                              console.error('Direct API test error:', error);
+                              showToast(`Direct API Test Error: ${error.message}`, 'error');
+                            }
+                          }}
+                          className="text-orange-600 hover:text-orange-800 font-medium text-xs"
+                        >
+                          🔧 Direct API Test
                         </button>
                         <button 
                           onClick={() => setShowTwilioGuideModal(true)}

@@ -858,24 +858,34 @@ const ClientManagement = () => {
 
   // Calculate dynamic analytics from current clients (which are already filtered by the API)
   const calculateDynamicAnalytics = () => {
+    // Define all possible campaign types
+    const allCampaigns = ['Data', 'Affiliate', 'Data2', 'Data3'];
+    
     // Calculate clients by campaign from current clients
     const campaignCounts = {};
     const statusCounts = {};
     
+    // Initialize all campaigns with 0 count
+    allCampaigns.forEach(campaign => {
+      campaignCounts[campaign] = 0;
+    });
+    
     clients.forEach(client => {
       // Count by campaign
       const campaign = client.campaign || 'Data';
-      campaignCounts[campaign] = (campaignCounts[campaign] || 0) + 1;
+      if (allCampaigns.includes(campaign)) {
+        campaignCounts[campaign] = (campaignCounts[campaign] || 0) + 1;
+      }
       
       // Count by status
       const status = client.status || 'Unknown';
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
     
-    // Convert to arrays for charts
-    const clientsByCampaign = Object.entries(campaignCounts).map(([campaign, count]) => ({
+    // Convert to arrays for charts - always include all campaigns
+    const clientsByCampaign = allCampaigns.map(campaign => ({
       _id: campaign,
-      count: count
+      count: campaignCounts[campaign] || 0
     }));
     
     const leadStatusOverview = Object.entries(statusCounts).map(([status, count]) => ({
@@ -892,12 +902,29 @@ const ClientManagement = () => {
 
   const dynamicAnalytics = calculateDynamicAnalytics();
 
-  // Transform analytics data for charts
-  const pieChartData = dynamicAnalytics.clientsByCampaign.map((item, index) => ({
-    name: item._id,
-    value: item.count,
-    color: ['#6366F1', '#8B5CF6', '#EC4899', '#F59E0B', '#EF4444', '#10B981'][index % 6]
-  }));
+  // Transform analytics data for charts with consistent colors for each campaign
+  const getCampaignChartColor = (campaign) => {
+    switch (campaign) {
+      case 'Data':
+        return '#6366F1'; // Indigo
+      case 'Affiliate':
+        return '#10B981'; // Emerald
+      case 'Data2':
+        return '#8B5CF6'; // Purple
+      case 'Data3':
+        return '#EC4899'; // Pink
+      default:
+        return '#6B7280'; // Gray
+    }
+  };
+
+  const pieChartData = dynamicAnalytics.clientsByCampaign
+    .map((item) => ({
+      name: item._id,
+      value: item.count === 0 ? 0.1 : item.count, // Use 0.1 for zero values to show as tiny segments
+      actualValue: item.count, // Keep the actual count for tooltip
+      color: getCampaignChartColor(item._id)
+    }));
 
 
 
@@ -1585,7 +1612,7 @@ const ClientManagement = () => {
                   </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center justify-between">
-                      <span>LAST COMMENT</span>
+                      <span>LATEST COMMENT</span>
                       <div className="flex flex-col ml-2">
                         <button
                           onClick={() => navigateDate('prev', 'comment')}
@@ -1679,8 +1706,19 @@ const ClientManagement = () => {
                            <div className="truncate">
                              {client.lastComment}
                            </div>
-                           <div className="text-xs text-gray-500">
-                             {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleString() : 'No date'}
+                           <div className="flex items-center justify-between text-xs text-gray-500">
+                             <span>
+                               {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleString() : 'No date'}
+                             </span>
+                             {client.lastCommentAuthor && (
+                               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                                 client.lastCommentAuthor.role === 'admin' 
+                                   ? 'bg-purple-100 text-purple-700' 
+                                   : 'bg-blue-100 text-blue-700'
+                               }`}>
+                                 {client.lastCommentAuthor.name}
+                               </span>
+                             )}
                            </div>
                          </div>
                        ) : (
@@ -1818,25 +1856,52 @@ const ClientManagement = () => {
            <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
              <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Campaign Status</h3>
              <div className="h-48 lg:h-64">
-              {pieChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieChartData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {pieChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
+              {dynamicAnalytics.clientsByCampaign.length > 0 ? (
+                <div className="flex items-center h-full">
+                  <div className="w-2/3 h-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieChartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                          minAngle={1} // Ensures even zero values show as tiny segments
+                        >
+                          {pieChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value, name, props) => {
+                            const actualValue = props.payload.actualValue;
+                            return [actualValue, name];
+                          }}
+                          labelFormatter={(label) => `${label}: ${pieChartData.find(item => item.name === label)?.actualValue || 0} clients`}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="w-1/3 pl-4">
+                    <div className="space-y-2">
+                      {dynamicAnalytics.clientsByCampaign.map((item) => (
+                        <div key={item._id} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center">
+                            <div 
+                              className="w-3 h-3 rounded-full mr-2" 
+                              style={{ backgroundColor: getCampaignChartColor(item._id) }}
+                            ></div>
+                            <span className="text-gray-700">{item._id}</span>
+                          </div>
+                          <span className="font-medium text-gray-900">{item.count}</span>
+                        </div>
                       ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">
                   <div className="text-center">
@@ -2323,7 +2388,7 @@ const ClientManagement = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">
-                Filter by {dateNavigationType === 'entry' ? 'CRM Entry Date' : 'Last Comment Date'}
+                Filter by {dateNavigationType === 'entry' ? 'CRM Entry Date' : 'Latest Comment Date'}
               </h3>
               <button 
                 onClick={() => setShowDateFilterModal(false)} 
@@ -2337,7 +2402,7 @@ const ClientManagement = () => {
               {/* Instructions */}
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Instructions:</strong> Choose how you want to filter the records by {dateNavigationType === 'entry' ? 'CRM entry date' : 'last comment date'}.
+                  <strong>Instructions:</strong> Choose how you want to filter the records by {dateNavigationType === 'entry' ? 'CRM entry date' : 'latest comment date'}.
                   You can select a single date or a range of dates using the calendar inputs below.
                 </p>
               </div>
@@ -2365,7 +2430,7 @@ const ClientManagement = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {dateFilterType === 'exact' 
-                    ? `${dateNavigationType === 'entry' ? 'CRM Entry' : 'Last Comment'} Date` 
+                    ? `${dateNavigationType === 'entry' ? 'CRM Entry' : 'Latest Comment'} Date` 
                     : 'Start Date'
                   }
                 </label>
@@ -2406,7 +2471,7 @@ const ClientManagement = () => {
                   <p className="text-sm text-gray-600">
                     <strong>Current Selection:</strong> 
                     {dateFilterType === 'exact' 
-                      ? ` ${dateNavigationType === 'entry' ? 'CRM Entry' : 'Last Comment'} date: ${dateFilter}`
+                      ? ` ${dateNavigationType === 'entry' ? 'CRM Entry' : 'Latest Comment'} date: ${dateFilter}`
                       : ` Date range: ${dateFilter} to ${endDateFilter || 'present'}`
                     }
                   </p>
