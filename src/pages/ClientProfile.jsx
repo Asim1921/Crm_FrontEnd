@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { clientAPI, taskAPI } from '../utils/api';
 import { 
   Phone, 
@@ -25,6 +26,7 @@ const ClientProfile = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addClientNotification } = useNotifications();
   
   const [client, setClient] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -93,6 +95,16 @@ const ClientProfile = () => {
         // Set notes from client data, sorted by creation date (newest first)
         const sortedNotes = (clientData.notes || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setNotes(sortedNotes);
+        
+        // Mark the latest note as viewed when opening the client profile
+        if (sortedNotes.length > 0) {
+          const latestNote = sortedNotes[0];
+          try {
+            await clientAPI.markNoteAsViewed(id, latestNote._id);
+          } catch (error) {
+            console.error('Error marking note as viewed:', error);
+          }
+        }
       } catch (err) {
         setError(err.message || 'Failed to load client data');
       } finally {
@@ -176,6 +188,29 @@ const ClientProfile = () => {
       setNewNote('');
       setNoteStatus('');
       setShowAddNoteModal(false);
+      
+      // Send notification to update ClientManagement component
+      addClientNotification('updated', client.firstName, id);
+      
+      // Dispatch custom event to notify ClientManagement component
+      console.log('Dispatching noteAdded event for client:', id, client.firstName);
+      window.dispatchEvent(new CustomEvent('noteAdded', { 
+        detail: { clientId: id, clientName: client.firstName } 
+      }));
+      
+      // Also set a flag in localStorage to trigger refresh
+      localStorage.setItem('noteAdded', JSON.stringify({
+        clientId: id,
+        clientName: client.firstName,
+        timestamp: Date.now()
+      }));
+      
+      // Force a page refresh of the ClientManagement tab if it exists
+      // This is a more direct approach to ensure the data is updated
+      setTimeout(() => {
+        // Try to refresh the ClientManagement page if it's open in another tab
+        window.postMessage({ type: 'REFRESH_CLIENT_MANAGEMENT' }, '*');
+      }, 100);
       
       alert('Note added successfully!');
     } catch (err) {
@@ -593,7 +628,11 @@ const ClientProfile = () => {
                       client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                       client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                       client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
-                      client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                      client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
+                      client.campaign === 'camping No Interest Rete' ? 'bg-red-100 text-red-800' :
+                      client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
+                      client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                      client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                       'bg-gray-100 text-gray-800'
                     }`}
                   >
@@ -603,6 +642,10 @@ const ClientProfile = () => {
                     <option value="Data4">Data4</option>
                     <option value="Data5">Data5</option>
                     <option value="Affiliate">Affiliate</option>
+                    <option value="camping No Interest Rete">camping No Interest Rete</option>
+                    <option value="DataR">DataR</option>
+                    <option value="Data2R">Data2R</option>
+                    <option value="AffiliateR">AffiliateR</option>
                   </select>
                 ) : (
                   <div className={`px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium w-full max-w-xs ${
@@ -611,7 +654,11 @@ const ClientProfile = () => {
                     client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                     client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                     client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
-                    client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                    client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
+                    client.campaign === 'camping No Interest Rete' ? 'bg-red-100 text-red-800' :
+                    client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
+                    client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                    client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                     'bg-gray-100 text-gray-800'
                   }`}>
                     {client.campaign || 'Data'}
@@ -904,7 +951,7 @@ const ClientProfile = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
                       <p className="text-gray-900">{client.lastName}</p>
                     </div>
-                    {user?.role === 'admin' && (
+                    {(user?.role === 'admin' || user?.role === 'tl') && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <p className="text-gray-900">{client.email || 'Not provided'}</p>

@@ -26,7 +26,8 @@ import {
   ChevronRight,
   ChevronUp,
   ChevronDown,
-  Copy
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
@@ -36,6 +37,7 @@ const ClientManagement = () => {
   const { addClientNotification } = useNotifications();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isTeamLeader = user?.role === 'tl';
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -52,8 +54,10 @@ const ClientManagement = () => {
   const [showCampaignFilter, setShowCampaignFilter] = useState(false);
   const [duplicateFilter, setDuplicateFilter] = useState(false);
   const [assignToAgent, setAssignToAgent] = useState('');
+  const [showSelectAllDropdown, setShowSelectAllDropdown] = useState(false);
   const statusFilterRef = useRef(null);
   const campaignFilterRef = useRef(null);
+  const selectAllDropdownRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -108,6 +112,7 @@ const ClientManagement = () => {
   // Bulk campaign date filter states
   const [bulkCampaignDateFilter, setBulkCampaignDateFilter] = useState('');
   const [bulkCampaignEndDateFilter, setBulkCampaignEndDateFilter] = useState('');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Date filter states
   const [showDateFilterModal, setShowDateFilterModal] = useState(false);
@@ -169,6 +174,14 @@ const ClientManagement = () => {
         return 'bg-orange-100 text-orange-800';
       case 'Affiliate':
         return 'bg-teal-100 text-teal-800';
+      case 'camping No Interest Rete':
+        return 'bg-red-100 text-red-800';
+      case 'DataR':
+        return 'bg-indigo-200 text-indigo-900';
+      case 'Data2R':
+        return 'bg-purple-200 text-purple-900';
+      case 'AffiliateR':
+        return 'bg-teal-200 text-teal-900';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -225,6 +238,7 @@ const ClientManagement = () => {
         ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
         ...(countryFilter !== 'all' && { country: countryFilter }),
         // For agents, automatically filter to only their assigned clients
+        // For TL, allow filtering by agent but don't restrict by default
         ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
         // Unassigned filter
         ...(unassignedFilter && { unassigned: true }),
@@ -246,6 +260,18 @@ const ClientManagement = () => {
       
       const clientsData = await clientAPI.getClients(params);
       let filteredClients = clientsData.clients || [];
+      
+      // Debug logging for client data
+      console.log('Fetched clients data:', filteredClients.length);
+      if (filteredClients.length > 0) {
+        console.log('First client data:', {
+          clientId: filteredClients[0].clientId,
+          firstName: filteredClients[0].firstName,
+          lastComment: filteredClients[0].lastComment,
+          lastCommentDate: filteredClients[0].lastCommentDate,
+          lastCommentViewer: filteredClients[0].lastCommentViewer
+        });
+      }
       
       // If duplicate filter is active, filter to show only duplicates
       if (duplicateFilter) {
@@ -304,6 +330,9 @@ const ClientManagement = () => {
       if (campaignFilterRef.current && !campaignFilterRef.current.contains(event.target)) {
         setShowCampaignFilter(false);
       }
+      if (selectAllDropdownRef.current && !selectAllDropdownRef.current.contains(event.target)) {
+        setShowSelectAllDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -336,6 +365,91 @@ const ClientManagement = () => {
     setCurrentPage(1);
   };
 
+  // Handle campaign overview clicks
+  const handleCampaignClick = (campaign) => {
+    setCampaignFilter(campaign);
+    setCurrentPage(1);
+  };
+
+  // Handle select all clients across all pages
+  const handleSelectAllClients = async () => {
+    try {
+      // Fetch all clients without pagination
+      const params = {
+        limit: 10000, // Large number to get all clients
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
+        ...(countryFilter !== 'all' && { country: countryFilter }),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        ...(unassignedFilter && { unassigned: true }),
+        ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
+        ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
+        ...(dateNavigationType === 'comment' && dateFilter && { commentDate: dateFilter }),
+        ...(dateNavigationType === 'comment' && endDateFilter && { endCommentDate: endDateFilter }),
+        ...(dateFilter && { dateFilterType: dateNavigationType })
+      };
+
+      const clientsData = await clientAPI.getClients(params);
+      const allClients = clientsData.clients || [];
+      
+      // Select all client IDs
+      const allClientIds = new Set(allClients.map(client => client._id));
+      setSelectedClients(allClientIds);
+      setSelectAll(true);
+      
+      alert(`Selected all ${allClientIds.size} clients across all pages`);
+    } catch (err) {
+      console.error('Error selecting all clients:', err);
+      alert('Failed to select all clients: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle delete all selected clients
+  const handleDeleteAllSelected = async () => {
+    if (selectedClients.size === 0) {
+      alert('No clients selected');
+      return;
+    }
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ALL ${selectedClients.size} selected client(s)? This action cannot be undone.`
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      await clientAPI.deleteClients(Array.from(selectedClients));
+      alert(`${selectedClients.size} client(s) deleted successfully!`);
+      // Clear selection and refresh data
+      setSelectedClients(new Set());
+      setSelectAll(false);
+      fetchData();
+    } catch (err) {
+      console.error('Error deleting clients:', err);
+      alert('Failed to delete clients: ' + (err.message || 'Unknown error'));
+    }
+  };
+
+  // Handle download all selected clients
+  const handleDownloadAllSelected = async () => {
+    if (selectedClients.size === 0) {
+      alert('No clients selected');
+      return;
+    }
+
+    try {
+      const clientIds = Array.from(selectedClients);
+      await clientAPI.exportClients('csv', clientIds);
+      alert(`Successfully exported ${clientIds.length} client(s)`);
+    } catch (err) {
+      console.error('Error exporting clients:', err);
+      alert('Failed to export clients: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   // Handle left-click on client name
   const handleClientNameClick = (e, clientId) => {
     e.preventDefault();
@@ -348,8 +462,16 @@ const ClientManagement = () => {
   };
 
   // Handle opening client profile in new tab
-  const handleOpenClientInNewTab = () => {
+  const handleOpenClientInNewTab = async () => {
     if (contextMenu.clientId) {
+      // Find the client to get the latest note ID
+      const client = clients.find(c => c._id === contextMenu.clientId);
+      if (client && client.notes && client.notes.length > 0) {
+        // Mark the latest note as viewed
+        const latestNote = client.notes[0]; // Notes are sorted by createdAt desc
+        await markNoteAsViewed(contextMenu.clientId, latestNote._id);
+      }
+      
       window.open(`/clients/${contextMenu.clientId}`, '_blank');
       setContextMenu({ show: false, x: 0, y: 0, clientId: null });
     }
@@ -372,15 +494,163 @@ const ClientManagement = () => {
     };
   }, [contextMenu.show]);
 
-  // Auto-refresh comments every 2 minutes
+  // Auto-refresh comments every 10 seconds for real-time updates (temporarily reduced for debugging)
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('Auto-refreshing comments...');
-      fetchData();
-    }, 2 * 60 * 1000); // 2 minutes in milliseconds
+      refreshCommentsOnly();
+    }, 10 * 1000); // 10 seconds in milliseconds
 
     return () => clearInterval(interval);
+  }, [currentPage, debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, duplicateFilter, dateFilter, endDateFilter, dateNavigationType]);
+
+  // Listen for note added events from other components
+  useEffect(() => {
+    const handleNoteAdded = (event) => {
+      console.log('Note added event received:', event.detail);
+      console.log('Refreshing data immediately...');
+      // Refresh immediately without delay
+      refreshDataImmediately();
+      // Add a small delay to ensure the database has been updated
+      setTimeout(() => {
+        console.log('First refresh after 200ms...');
+        refreshDataImmediately();
+      }, 200);
+      setTimeout(() => {
+        console.log('Second refresh after 1 second...');
+        refreshDataImmediately();
+      }, 1000);
+    };
+
+    const handleStorageChange = (event) => {
+      if (event.key === 'noteAdded') {
+        console.log('localStorage noteAdded event received:', event.newValue);
+        const noteData = JSON.parse(event.newValue);
+        console.log('Refreshing data due to localStorage change...');
+        setTimeout(() => {
+          refreshDataImmediately();
+        }, 500);
+      }
+    };
+
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'REFRESH_CLIENT_MANAGEMENT') {
+        console.log('Received postMessage to refresh ClientManagement');
+        setTimeout(() => {
+          refreshDataImmediately();
+        }, 200);
+      }
+    };
+
+    window.addEventListener('noteAdded', handleNoteAdded);
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('message', handleMessage);
+    console.log('ClientManagement: Added noteAdded event listener, storage listener, and message listener');
+    
+    return () => {
+      window.removeEventListener('noteAdded', handleNoteAdded);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('message', handleMessage);
+      console.log('ClientManagement: Removed event listeners');
+    };
   }, []);
+
+  // Function to update a specific client in the list
+  const updateClientInList = (updatedClient) => {
+    setClients(prevClients => 
+      prevClients.map(client => 
+        client._id === updatedClient._id ? updatedClient : client
+      )
+    );
+  };
+
+  // Function to mark a note as viewed when someone opens the client profile
+  const markNoteAsViewed = async (clientId, noteId) => {
+    try {
+      await clientAPI.markNoteAsViewed(clientId, noteId);
+      // Refresh the specific client data to get updated viewer information
+      refreshCommentsOnly();
+    } catch (error) {
+      console.error('Error marking note as viewed:', error);
+    }
+  };
+
+  // Function to refresh data immediately (can be called from other components)
+  const refreshDataImmediately = async () => {
+    console.log('Refreshing data immediately...');
+    setIsRefreshing(true);
+    try {
+      await fetchData();
+      console.log('Data refresh completed');
+      console.log('Current clients after refresh:', clients.length);
+      if (clients.length > 0) {
+        console.log('First client lastComment:', clients[0].lastComment);
+        console.log('First client lastCommentDate:', clients[0].lastCommentDate);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  // Make refresh function available globally for debugging
+  useEffect(() => {
+    window.refreshClientManagement = refreshDataImmediately;
+    return () => {
+      delete window.refreshClientManagement;
+    };
+  }, []);
+
+  // Function to refresh only comments data without full page reload
+  const refreshCommentsOnly = async () => {
+    try {
+      setIsRefreshing(true);
+      const params = {
+        page: duplicateFilter ? 1 : currentPage,
+        limit: duplicateFilter ? 1000 : 50,
+        ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
+        ...(countryFilter !== 'all' && { country: countryFilter }),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        ...(unassignedFilter && { unassigned: true }),
+        ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
+        ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
+        ...(dateNavigationType === 'comment' && dateFilter && { commentDate: dateFilter }),
+        ...(dateNavigationType === 'comment' && endDateFilter && { endCommentDate: endDateFilter }),
+        ...(dateFilter && { dateFilterType: dateNavigationType })
+      };
+      
+      const clientsData = await clientAPI.getClients(params);
+      let filteredClients = clientsData.clients || [];
+      
+      if (duplicateFilter) {
+        const duplicateIds = findDuplicateClients(filteredClients);
+        filteredClients = filteredClients.filter(client => duplicateIds.includes(client._id));
+      }
+      
+      // Only update if there are actual changes
+      setClients(prevClients => {
+        const hasChanges = prevClients.some((prevClient, index) => {
+          const newClient = filteredClients[index];
+          if (!newClient) return true;
+          return (
+            prevClient.lastComment !== newClient.lastComment ||
+            prevClient.lastCommentDate !== newClient.lastCommentDate ||
+            JSON.stringify(prevClient.lastCommentAuthor) !== JSON.stringify(newClient.lastCommentAuthor) ||
+            JSON.stringify(prevClient.lastCommentViewer) !== JSON.stringify(newClient.lastCommentViewer)
+          );
+        });
+        
+        return hasChanges ? filteredClients : prevClients;
+      });
+    } catch (err) {
+      console.error('Error refreshing comments:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Handle select all checkbox
   const handleSelectAll = (checked) => {
@@ -859,7 +1129,7 @@ const ClientManagement = () => {
   // Calculate dynamic analytics from current clients (which are already filtered by the API)
   const calculateDynamicAnalytics = () => {
     // Define all possible campaign types
-    const allCampaigns = ['Data', 'Affiliate', 'Data2', 'Data3'];
+    const allCampaigns = ['Data', 'Affiliate', 'Data2', 'Data3', 'camping No Interest Rete', 'DataR', 'Data2R', 'AffiliateR'];
     
     // Calculate clients by campaign from current clients
     const campaignCounts = {};
@@ -913,6 +1183,14 @@ const ClientManagement = () => {
         return '#8B5CF6'; // Purple
       case 'Data3':
         return '#EC4899'; // Pink
+      case 'camping No Interest Rete':
+        return '#EF4444'; // Red
+      case 'DataR':
+        return '#4338CA'; // Dark Indigo
+      case 'Data2R':
+        return '#7C3AED'; // Dark Purple
+      case 'AffiliateR':
+        return '#059669'; // Dark Emerald
       default:
         return '#6B7280'; // Gray
     }
@@ -976,7 +1254,7 @@ const ClientManagement = () => {
                 </option>
               ))}
             </select>
-            {isAdmin && (
+            {(isAdmin || isTeamLeader) && (
               <select 
                 value={agentFilter}
                 onChange={(e) => {
@@ -1020,44 +1298,38 @@ const ClientManagement = () => {
                 }
               }}
               disabled={selectedClients.size !== 1}
-              className="flex items-center justify-center px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+              className="flex items-center justify-center px-2 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             >
-              <Edit className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Edit Client</span>
-              <span className="sm:hidden">Edit</span>
+              <Edit className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">Edit</span>
             </button>
             <button 
               onClick={() => setShowImportModal(true)}
-              className="flex items-center justify-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+              className="flex items-center justify-center px-2 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
             >
-              <Upload className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Import Excel</span>
-              <span className="sm:hidden">Import</span>
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">Import</span>
             </button>
             <button 
               onClick={handleExportClients}
               disabled={selectedClients.size === 0}
-              className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm transition-colors ${
+              className={`flex items-center justify-center px-2 py-2 rounded-lg text-sm transition-colors ${
                 selectedClients.size === 0
                   ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
             >
-              <Download className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">
-                Export Excel {selectedClients.size > 0 && `(${selectedClients.size})`}
-              </span>
-              <span className="sm:hidden">
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">
                 Export {selectedClients.size > 0 && `(${selectedClients.size})`}
               </span>
             </button>
             <button 
               onClick={() => setShowAddModal(true)}
-              className="flex items-center justify-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+              className="flex items-center justify-center px-2 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
             >
-              <Plus className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Add Client</span>
-              <span className="sm:hidden">Add</span>
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline ml-1">Add</span>
             </button>
           </div>
         )}
@@ -1096,10 +1368,61 @@ const ClientManagement = () => {
                <button 
                  onClick={handleAssignClients}
                  disabled={selectedClients.size === 0 || !assignToAgent}
-                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                 className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
                >
                  Assign ({selectedClients.size})
                </button>
+               
+               {/* Select All Dropdown */}
+               <div className="relative" ref={selectAllDropdownRef}>
+                 <button 
+                   onClick={() => setShowSelectAllDropdown(!showSelectAllDropdown)}
+                   className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1"
+                 >
+                   <Users className="w-4 h-4" />
+                   <span>Select All</span>
+                 </button>
+                 
+                 {showSelectAllDropdown && (
+                   <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                     <div className="py-1">
+                       <button
+                         onClick={() => {
+                           handleSelectAllClients();
+                           setShowSelectAllDropdown(false);
+                         }}
+                         className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
+                       >
+                         Select All Clients
+                       </button>
+                       <button
+                         onClick={() => {
+                           handleDeleteAllSelected();
+                           setShowSelectAllDropdown(false);
+                         }}
+                         disabled={selectedClients.size === 0}
+                         className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                           selectedClients.size === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-red-700 hover:bg-red-50'
+                         }`}
+                       >
+                         Delete All ({selectedClients.size})
+                       </button>
+                       <button
+                         onClick={() => {
+                           handleDownloadAllSelected();
+                           setShowSelectAllDropdown(false);
+                         }}
+                         disabled={selectedClients.size === 0}
+                         className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                           selectedClients.size === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-700 hover:bg-blue-50'
+                         }`}
+                       >
+                         Download All ({selectedClients.size})
+                       </button>
+                     </div>
+                   </div>
+                 )}
+               </div>
              </div>
            </div>
            <div className="flex items-center space-x-2">
@@ -1342,6 +1665,54 @@ const ClientManagement = () => {
                      </button>
                      <button
                        onClick={() => {
+                         setCampaignFilter('camping No Interest Rete');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'camping No Interest Rete' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       camping No Interest Rete
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('DataR');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'DataR' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       DataR
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('Data2R');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'Data2R' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       Data2R
+                     </button>
+                     <button
+                       onClick={() => {
+                         setCampaignFilter('AffiliateR');
+                         setShowCampaignFilter(false);
+                         setCurrentPage(1);
+                       }}
+                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                         campaignFilter === 'AffiliateR' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                       }`}
+                     >
+                       AffiliateR
+                     </button>
+                     <button
+                       onClick={() => {
                          setCampaignFilter('Data4');
                          setShowCampaignFilter(false);
                          setCurrentPage(1);
@@ -1386,10 +1757,10 @@ const ClientManagement = () => {
                  fetchBulkCampaignClients();
                  setShowBulkCampaignModal(true);
                }}
-               className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-1"
+               className="px-2 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-1"
              >
                <Users className="w-4 h-4" />
-               <span>Bulk Update</span>
+               <span className="hidden sm:inline">Bulk</span>
              </button>
              <button 
                onClick={() => {
@@ -1400,29 +1771,29 @@ const ClientManagement = () => {
                  }
                  setCurrentPage(1); // Reset to first page when filter changes
                }}
-               className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+               className={`px-2 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
                  unassignedFilter 
                    ? 'bg-red-600 hover:bg-red-700' 
                    : 'bg-gray-600 hover:bg-gray-700'
                }`}
              >
                <User className="w-4 h-4" />
-               <span>Unassigned</span>
+               <span className="hidden sm:inline">Unassigned</span>
              </button>
              <button 
                onClick={() => setShowDateFilterModal(true)}
-               className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1 border-2 border-green-500 hover:border-green-400"
+               className="px-2 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1 border-2 border-green-500 hover:border-green-400"
              >
                <Calendar className="w-4 h-4" />
-               <span>Date</span>
+               <span className="hidden sm:inline">Date</span>
              </button>
              <button 
                onClick={handleDeleteClients}
                disabled={selectedClients.size === 0}
-               className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center space-x-2"
+               className="px-2 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center space-x-1"
              >
                <Trash2 className="w-4 h-4" />
-               <span>Delete ({selectedClients.size})</span>
+               <span className="hidden sm:inline">Delete ({selectedClients.size})</span>
              </button>
            </div>
          </div>
@@ -1584,7 +1955,10 @@ const ClientManagement = () => {
                    {user?.role === 'agent' && (
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
                    )}
-                  {isAdmin && (
+                   {user?.role === 'tl' && (
+                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
+                   )}
+                  {(isAdmin || isTeamLeader) && (
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
                   )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
@@ -1673,7 +2047,10 @@ const ClientManagement = () => {
                       {user?.role === 'agent' && (
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-400">••••••••••</td>
                       )}
-                     {isAdmin && (
+                      {user?.role === 'tl' && (
+                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.email}</td>
+                      )}
+                     {(isAdmin || isTeamLeader) && (
                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                          {client.assignedAgent ? (
                            <div className="flex items-center">
@@ -1702,23 +2079,42 @@ const ClientManagement = () => {
                      </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900 max-w-xs">
                        {client.lastComment ? (
-                         <div className="space-y-1">
-                           <div className="truncate">
+                         <div className="space-y-2">
+                           <div className="truncate text-gray-900 font-medium">
                              {client.lastComment}
                            </div>
-                           <div className="flex items-center justify-between text-xs text-gray-500">
-                             <span>
-                               {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleString() : 'No date'}
-                             </span>
-                             {client.lastCommentAuthor && (
-                               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                                 client.lastCommentAuthor.role === 'admin' 
-                                   ? 'bg-purple-100 text-purple-700' 
-                                   : 'bg-blue-100 text-blue-700'
-                               }`}>
-                                 {client.lastCommentAuthor.name}
+                           <div className="flex flex-col space-y-1">
+                             <div className="flex items-center justify-between">
+                               <span className="text-xs text-gray-500">
+                                 {client.lastCommentDate ? new Date(client.lastCommentDate).toLocaleString() : 'No date'}
                                </span>
+                             {client.lastCommentViewer && (
+                               <div className="flex items-center space-x-1">
+                                 <div className={`w-2 h-2 rounded-full ${
+                                   client.lastCommentViewer.role === 'admin' 
+                                     ? 'bg-purple-500' 
+                                     : 'bg-blue-500'
+                                 }`}></div>
+                                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                   client.lastCommentViewer.role === 'admin' 
+                                     ? 'bg-purple-100 text-purple-700' 
+                                     : 'bg-blue-100 text-blue-700'
+                                 }`}>
+                                   {client.lastCommentViewer.name}
+                                 </span>
+                               </div>
                              )}
+                           </div>
+                           {client.lastCommentViewer && (
+                             <div className="text-xs text-gray-400">
+                               Last viewed by {client.lastCommentViewer.role === 'admin' ? 'Administrator' : 'Agent'}
+                               {client.lastCommentViewer.viewedAt && (
+                                 <span className="ml-1">
+                                   • {new Date(client.lastCommentViewer.viewedAt).toLocaleString()}
+                                 </span>
+                               )}
+                             </div>
+                           )}
                            </div>
                          </div>
                        ) : (
@@ -1843,18 +2239,50 @@ const ClientManagement = () => {
            <div className="lg:col-span-2 mb-2">
              <div className="flex items-center justify-between">
                <h2 className="text-lg font-semibold text-gray-900">Analytics Overview</h2>
-               <div className="text-sm text-gray-600">
-                 Showing data for {dynamicAnalytics.totalClients} filtered client{dynamicAnalytics.totalClients !== 1 ? 's' : ''}
-                 {(agentFilter !== 'all' || statusFilter !== 'all' || countryFilter !== 'all' || debouncedSearchTerm) && (
-                   <span className="ml-2 text-blue-600">• Filtered View</span>
-                 )}
+               <div className="flex items-center space-x-4">
+                 <div className="text-sm text-gray-600">
+                   Showing data for {dynamicAnalytics.totalClients} filtered client{dynamicAnalytics.totalClients !== 1 ? 's' : ''}
+                   {(agentFilter !== 'all' || statusFilter !== 'all' || countryFilter !== 'all' || debouncedSearchTerm) && (
+                     <span className="ml-2 text-blue-600">• Filtered View</span>
+                   )}
+                 </div>
+                 <button
+                   onClick={refreshDataImmediately}
+                   disabled={isRefreshing}
+                   className={`flex items-center space-x-1 px-3 py-1 text-sm rounded-lg transition-colors ${
+                     isRefreshing 
+                       ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                       : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                   }`}
+                   title="Refresh all data immediately"
+                 >
+                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                   <span>{isRefreshing ? 'Refreshing...' : 'Refresh Now'}</span>
+                 </button>
                </div>
              </div>
            </div>
                    
                    {/* Clients by Campaign Status */}
-           <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
-             <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-4">Clients by Campaign Status</h3>
+          <div className="bg-white rounded-lg p-4 lg:p-6 shadow-sm">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Clients by Campaign Status</h3>
+                {campaignFilter !== 'all' && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Showing data for: {campaignFilter}
+                  </p>
+                )}
+              </div>
+              {campaignFilter !== 'all' && (
+                <button
+                  onClick={() => setCampaignFilter('all')}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
              <div className="h-48 lg:h-64">
               {dynamicAnalytics.clientsByCampaign.length > 0 ? (
                 <div className="flex items-center h-full">
@@ -1887,16 +2315,42 @@ const ClientManagement = () => {
                   </div>
                   <div className="w-1/3 pl-4">
                     <div className="space-y-2">
+                      {campaignFilter !== 'all' && (
+                        <div 
+                          className="flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors hover:bg-gray-50"
+                          onClick={() => setCampaignFilter('all')}
+                        >
+                          <div className="flex items-center">
+                            <div className="w-3 h-3 rounded-full mr-3 bg-gray-400"></div>
+                            <span className="text-sm text-gray-700">Show All</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-900">
+                            {dynamicAnalytics.totalClients}
+                          </span>
+                        </div>
+                      )}
                       {dynamicAnalytics.clientsByCampaign.map((item) => (
-                        <div key={item._id} className="flex items-center justify-between text-sm">
+                        <div 
+                          key={item._id} 
+                          className={`flex items-center justify-between text-sm cursor-pointer p-2 rounded-lg transition-colors ${
+                            campaignFilter === item._id 
+                              ? 'bg-blue-50 border border-blue-200' 
+                              : 'hover:bg-gray-50'
+                          }`}
+                          onClick={() => handleCampaignClick(item._id)}
+                        >
                           <div className="flex items-center">
                             <div 
                               className="w-3 h-3 rounded-full mr-2" 
                               style={{ backgroundColor: getCampaignChartColor(item._id) }}
                             ></div>
-                            <span className="text-gray-700">{item._id}</span>
+                            <span className={`${campaignFilter === item._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                              {item._id}
+                            </span>
                           </div>
-                          <span className="font-medium text-gray-900">{item.count}</span>
+                          <span className={`font-medium ${campaignFilter === item._id ? 'text-blue-700' : 'text-gray-900'}`}>
+                            {item.count}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -2105,6 +2559,12 @@ const ClientManagement = () => {
                 >
                   <option value="Data">Data</option>
                   <option value="Affiliate">Affiliate</option>
+                  <option value="Data2">Data2</option>
+                  <option value="Data3">Data3</option>
+                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="DataR">DataR</option>
+                  <option value="Data2R">Data2R</option>
+                  <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
             </div>
@@ -2229,6 +2689,10 @@ const ClientManagement = () => {
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
+                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="DataR">DataR</option>
+                  <option value="Data2R">Data2R</option>
+                  <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
 
@@ -2332,7 +2796,11 @@ const ClientManagement = () => {
                             client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                             client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                             client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
-                            client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                            client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
+                            client.campaign === 'camping No Interest Rete' ? 'bg-red-100 text-red-800' :
+                            client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
+                            client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                            client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                             'bg-gray-100 text-gray-800'
                           }`}>
                             {client.campaign || 'Data'}
@@ -2584,6 +3052,10 @@ const ClientManagement = () => {
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
+                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="DataR">DataR</option>
+                  <option value="Data2R">Data2R</option>
+                  <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
             </div>

@@ -181,6 +181,12 @@ export const clientAPI = {
     return apiRequest(`/clients/${clientId}/notes/${noteId}`, {
       method: 'DELETE'
     });
+  },
+
+  markNoteAsViewed: async (clientId, noteId) => {
+    return apiRequest(`/clients/${clientId}/notes/${noteId}/view`, {
+      method: 'PUT'
+    });
   }
 };
 
