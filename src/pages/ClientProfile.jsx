@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
-import { clientAPI, taskAPI } from '../utils/api';
+import { clientAPI, taskAPI, amiClick2CallAPI } from '../utils/api';
 import { 
   Phone, 
   MessageCircle, 
@@ -60,6 +60,11 @@ const ClientProfile = () => {
   const [bulkCampaign, setBulkCampaign] = useState('Data');
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  // AMI integration states
+  const [amiStatus, setAmiStatus] = useState('disconnected');
+  const [amiServiceInfo, setAmiServiceInfo] = useState(null);
+  const [useAmiIntegration, setUseAmiIntegration] = useState(true);
+
   // Fetch all clients for navigation
   useEffect(() => {
     const fetchAllClientsForNavigation = async () => {
@@ -77,6 +82,30 @@ const ClientProfile = () => {
 
     fetchAllClientsForNavigation();
   }, [id]);
+
+  // Initialize AMI integration
+  const initializeAmiClick2Call = async () => {
+    try {
+      setAmiStatus('connecting');
+      const statusResponse = await amiClick2CallAPI.getStatus();
+      
+      if (statusResponse.success) {
+        setAmiStatus('connected');
+        setAmiServiceInfo(statusResponse.data);
+      } else {
+        setAmiStatus('error');
+        console.error('AMI status check failed:', statusResponse.error);
+      }
+    } catch (error) {
+      console.error('Failed to initialize AMI integration:', error);
+      setAmiStatus('error');
+    }
+  };
+
+  // Initialize AMI on component mount
+  useEffect(() => {
+    initializeAmiClick2Call();
+  }, []);
 
   // Fetch client data
   useEffect(() => {
@@ -128,16 +157,48 @@ const ClientProfile = () => {
     }
   };
 
+  // AMI call function
+  const initiateAmiCall = async (phoneNumber, clientId) => {
+    try {
+      console.log('Initiating AMI call to:', phoneNumber, 'for client:', clientId);
+      
+      const callData = {
+        phoneNumber: phoneNumber,
+        clientId: clientId,
+        channel: 'voip'
+      };
+
+      const response = await amiClick2CallAPI.makeCall(callData);
+      
+      if (response.success) {
+        console.log('AMI call initiated successfully:', response);
+        alert(`Call initiated successfully to ${phoneNumber}`);
+      } else {
+        console.error('AMI call failed:', response.error);
+        alert(`Failed to initiate call: ${response.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error initiating AMI call:', error);
+      alert(`Error initiating call: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   // Handle call client
-  const handleCall = () => {
+  const handleCall = async () => {
     if (!client?.phone) {
       alert('Client phone number not found');
       return;
     }
     
     const phoneNumber = client.phone.replace(/\D/g, '');
-    const telUrl = `tel:${phoneNumber}`;
-    window.open(telUrl, '_self');
+    
+    if (useAmiIntegration && amiStatus === 'connected') {
+      await initiateAmiCall(phoneNumber, client._id);
+    } else {
+      // Fallback to regular tel: link
+      const telUrl = `tel:${phoneNumber}`;
+      window.open(telUrl, '_self');
+    }
   };
 
 
@@ -666,6 +727,34 @@ const ClientProfile = () => {
                 )}
               </div>
               
+              {/* AMI Integration Status */}
+              <div className="flex items-center justify-center space-x-2 mb-3">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  useAmiIntegration ? (
+                    amiStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                    amiStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  ) : (
+                    'bg-gray-100 text-gray-800'
+                  )
+                }`}>
+                  {useAmiIntegration ? (
+                    amiStatus === 'connected' ? 'AMI Connected' :
+                    amiStatus === 'connecting' ? 'AMI Connecting' :
+                    amiStatus === 'error' ? 'AMI Error' : 'AMI Disconnected'
+                  ) : (
+                    'External Call'
+                  )}
+                </span>
+                <button
+                  onClick={() => setUseAmiIntegration(!useAmiIntegration)}
+                  className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                  title={`Switch to ${useAmiIntegration ? 'External' : 'AMI'} service`}
+                >
+                  {useAmiIntegration ? 'Use External' : 'Use AMI'}
+                </button>
+              </div>
+
               <div className="flex items-center justify-center space-x-4">
                 <button
                   onClick={handleCall}
@@ -706,6 +795,34 @@ const ClientProfile = () => {
           {/* Quick Actions Card */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+            
+            {/* AMI Status in Quick Actions */}
+            <div className="flex items-center justify-center space-x-2 mb-4">
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                useAmiIntegration ? (
+                  amiStatus === 'connected' ? 'bg-green-100 text-green-800' :
+                  amiStatus === 'connecting' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                ) : (
+                  'bg-gray-100 text-gray-800'
+                )
+              }`}>
+                {useAmiIntegration ? (
+                  amiStatus === 'connected' ? 'AMI Connected' :
+                  amiStatus === 'connecting' ? 'AMI Connecting' :
+                  amiStatus === 'error' ? 'AMI Error' : 'AMI Disconnected'
+                ) : (
+                  'External Call'
+                )}
+              </span>
+              <button
+                onClick={() => setUseAmiIntegration(!useAmiIntegration)}
+                className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded hover:bg-blue-200 transition-colors"
+                title={`Switch to ${useAmiIntegration ? 'External' : 'AMI'} service`}
+              >
+                {useAmiIntegration ? 'Use External' : 'Use AMI'}
+              </button>
+            </div>
             
             <div className="space-y-3">
               <button
