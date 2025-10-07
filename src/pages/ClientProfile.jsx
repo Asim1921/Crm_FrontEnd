@@ -547,6 +547,8 @@ const ClientProfile = () => {
         return 'bg-purple-100 text-purple-800';
       case 'Wrong Number':
         return 'bg-red-100 text-red-800';
+      case 'Wrong Name':
+        return 'bg-red-100 text-red-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'pending':
@@ -667,6 +669,7 @@ const ClientProfile = () => {
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
                   <option value="Wrong Number">Wrong Number</option>
+                  <option value="Wrong Name">Wrong Name</option>
                 </select>
               </div>
 
@@ -1038,6 +1041,7 @@ const ClientProfile = () => {
                         <option value="Not Interested">Not Interested</option>
                         <option value="Hang Up">Hang Up</option>
                         <option value="Wrong Number">Wrong Number</option>
+                        <option value="Wrong Name">Wrong Name</option>
                       </select>
                     </div>
                     <div>
@@ -1305,6 +1309,10 @@ const ClientProfile = () => {
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
+                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="DataR">DataR</option>
+                  <option value="Data2R">Data2R</option>
+                  <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
 
