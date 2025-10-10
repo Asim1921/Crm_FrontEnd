@@ -1343,126 +1343,132 @@ const ClientManagement = () => {
         )}
       </div>
 
-             {/* Assignment Bar - Only for Admins */}
-       {isAdmin(user) && (
-         <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0 mb-6 p-4 bg-white rounded-lg shadow-sm">
-           <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-             <div className="flex items-center space-x-2">
-               <input 
-                 type="checkbox" 
-                 id="selectAll" 
-                 checked={selectAll}
-                 onChange={(e) => handleSelectAll(e.target.checked)}
-                 className="w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-               />
-               <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
-                 Select All
-               </label>
-             </div>
-             <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-               <span className="text-sm text-gray-700 font-medium">Assign to:</span>
-               <select 
-                 value={assignToAgent}
-                 onChange={(e) => setAssignToAgent(e.target.value)}
-                 className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-               >
-                 <option value="">Select Agent</option>
-                 {availableAgents.map((agent) => (
-                   <option key={agent._id} value={agent._id}>
-                     {agent.firstName} {agent.lastName}
-                   </option>
-                 ))}
-               </select>
-               <button 
-                 onClick={handleAssignClients}
-                 disabled={selectedClients.size === 0 || !assignToAgent}
-                 className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-               >
-                 Assign ({selectedClients.size})
-               </button>
-               
-               {/* Select All Dropdown */}
-               <div className="relative" ref={selectAllDropdownRef}>
-                 <button 
-                   onClick={() => setShowSelectAllDropdown(!showSelectAllDropdown)}
-                   className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1"
-                 >
-                   <Users className="w-4 h-4" />
-                   <span>Select All</span>
-                 </button>
-                 
-                 {showSelectAllDropdown && (
-                   <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                     <div className="py-1">
-                       <button
-                         onClick={() => {
-                           handleSelectAllClients();
-                           setShowSelectAllDropdown(false);
-                         }}
-                         className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
-                       >
-                         Select All Clients
-                       </button>
-                       <button
-                         onClick={() => {
-                           handleDeleteAllSelected();
-                           setShowSelectAllDropdown(false);
-                         }}
-                         disabled={selectedClients.size === 0}
-                         className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                           selectedClients.size === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-red-700 hover:bg-red-50'
-                         }`}
-                       >
-                         Delete All ({selectedClients.size})
-                       </button>
-                       <button
-                         onClick={() => {
-                           handleDownloadAllSelected();
-                           setShowSelectAllDropdown(false);
-                         }}
-                         disabled={selectedClients.size === 0}
-                         className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                           selectedClients.size === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-700 hover:bg-blue-50'
-                         }`}
-                       >
-                         Download All ({selectedClients.size})
-                       </button>
-                     </div>
-                   </div>
-                 )}
-               </div>
-             </div>
-           </div>
-           <div className="flex items-center space-x-2">
-             {/* Duplicate Clients Button */}
-             <button 
-               onClick={() => {
-                 setDuplicateFilter(!duplicateFilter);
-                 setCurrentPage(1); // Reset to first page when filter changes
-               }}
-               className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
-                 duplicateFilter 
-                   ? 'bg-red-600 hover:bg-red-700' 
-                   : 'bg-gray-600 hover:bg-gray-700'
-               }`}
-             >
-               <Copy className="w-4 h-4" />
-               <span>Duplicates</span>
-             </button>
-             
-             {/* Search by Status Button */}
-             <div className="relative" ref={statusFilterRef}>
-               <button 
-                 onClick={() => setShowStatusFilter(!showStatusFilter)}
-                 className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
-                   statusFilter !== 'all' 
-                     ? 'bg-red-600 hover:bg-red-700' 
-                     : 'bg-gray-600 hover:bg-gray-700'
-                 }`}
-               >
-                 <Filter className="w-4 h-4" />
-                 <span>Status</span>
-               </button>
+      {/* Combined Assignment Bar and Filter Buttons - Same Line */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0 mb-6 p-4 bg-white rounded-lg shadow-sm">
+        {/* Left Side - Assignment Controls (Admin only) */}
+        {isAdmin(user) && (
+          <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="selectAll" 
+                checked={selectAll}
+                onChange={(e) => handleSelectAll(e.target.checked)}
+                className="w-5 h-5 text-blue-600 border-2 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="selectAll" className="text-sm text-gray-700 font-medium">
+                Select All
+              </label>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+              <span className="text-sm text-gray-700 font-medium">Assign to:</span>
+              <select 
+                value={assignToAgent}
+                onChange={(e) => setAssignToAgent(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+              >
+                <option value="">Select Agent</option>
+                {availableAgents.map((agent) => (
+                  <option key={agent._id} value={agent._id}>
+                    {agent.firstName} {agent.lastName}
+                  </option>
+                ))}
+              </select>
+              <button 
+                onClick={handleAssignClients}
+                disabled={selectedClients.size === 0 || !assignToAgent}
+                className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              >
+                Assign ({selectedClients.size})
+              </button>
+              
+              {/* Select All Dropdown */}
+              <div className="relative" ref={selectAllDropdownRef}>
+                <button 
+                  onClick={() => setShowSelectAllDropdown(!showSelectAllDropdown)}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Select All</span>
+                </button>
+                
+                {showSelectAllDropdown && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="py-1">
+                      <button
+                        onClick={() => {
+                          handleSelectAllClients();
+                          setShowSelectAllDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
+                      >
+                        Select All Clients
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDeleteAllSelected();
+                          setShowSelectAllDropdown(false);
+                        }}
+                        disabled={selectedClients.size === 0}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                          selectedClients.size === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-red-700 hover:bg-red-50'
+                        }`}
+                      >
+                        Delete All ({selectedClients.size})
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDownloadAllSelected();
+                          setShowSelectAllDropdown(false);
+                        }}
+                        disabled={selectedClients.size === 0}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                          selectedClients.size === 0 ? 'text-gray-400 cursor-not-allowed' : 'text-blue-700 hover:bg-blue-50'
+                        }`}
+                      >
+                        Download All ({selectedClients.size})
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Right Side - Filter Buttons */}
+        <div className="flex items-center space-x-2 flex-wrap">
+          {/* Duplicate Clients Button - Admin only */}
+          {isAdmin(user) && (
+            <button 
+              onClick={() => {
+                setDuplicateFilter(!duplicateFilter);
+                setCurrentPage(1); // Reset to first page when filter changes
+              }}
+              className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+                duplicateFilter 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              <Copy className="w-4 h-4" />
+              <span>Duplicates</span>
+            </button>
+          )}
+          
+          {/* Search by Status Button */}
+          <div className="relative" ref={statusFilterRef}>
+            <button 
+              onClick={() => setShowStatusFilter(!showStatusFilter)}
+              className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+                statusFilter !== 'all' 
+                  ? 'bg-red-600 hover:bg-red-700' 
+                  : 'bg-gray-600 hover:bg-gray-700'
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span>Status</span>
+            </button>
                
                {/* Status Filter Dropdown */}
                {showStatusFilter && (
@@ -1760,52 +1766,56 @@ const ClientManagement = () => {
                )}
              </div>
              
-             <button 
-               onClick={() => {
-                 fetchBulkCampaignClients();
-                 setShowBulkCampaignModal(true);
-               }}
-               className="px-2 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-1"
-             >
-               <Users className="w-4 h-4" />
-               <span className="hidden sm:inline">Bulk</span>
-             </button>
-             <button 
-               onClick={() => {
-                 setUnassignedFilter(!unassignedFilter);
-                 // Reset agent filter when unassigned filter is activated
-                 if (!unassignedFilter) {
-                   setAgentFilter('all');
-                 }
-                 setCurrentPage(1); // Reset to first page when filter changes
-               }}
-               className={`px-2 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
-                 unassignedFilter 
-                   ? 'bg-red-600 hover:bg-red-700' 
-                   : 'bg-gray-600 hover:bg-gray-700'
-               }`}
-             >
-               <User className="w-4 h-4" />
-               <span className="hidden sm:inline">Unassigned</span>
-             </button>
-             <button 
-               onClick={() => setShowDateFilterModal(true)}
-               className="px-2 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1 border-2 border-green-500 hover:border-green-400"
-             >
-               <Calendar className="w-4 h-4" />
-               <span className="hidden sm:inline">Date</span>
-             </button>
-             <button 
-               onClick={handleDeleteClients}
-               disabled={selectedClients.size === 0}
-               className="px-2 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center space-x-1"
-             >
-               <Trash2 className="w-4 h-4" />
-               <span className="hidden sm:inline">Delete ({selectedClients.size})</span>
-             </button>
-           </div>
-         </div>
-       )}
+             {/* Admin-only filter buttons */}
+             {isAdmin(user) && (
+               <>
+                 <button 
+                   onClick={() => {
+                     fetchBulkCampaignClients();
+                     setShowBulkCampaignModal(true);
+                   }}
+                   className="px-3 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 text-sm font-medium flex items-center space-x-1"
+                 >
+                   <Users className="w-4 h-4" />
+                   <span>Bulk</span>
+                 </button>
+                 <button 
+                   onClick={() => {
+                     setUnassignedFilter(!unassignedFilter);
+                     // Reset agent filter when unassigned filter is activated
+                     if (!unassignedFilter) {
+                       setAgentFilter('all');
+                     }
+                     setCurrentPage(1); // Reset to first page when filter changes
+                   }}
+                   className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
+                     unassignedFilter 
+                       ? 'bg-red-600 hover:bg-red-700' 
+                       : 'bg-gray-600 hover:bg-gray-700'
+                   }`}
+                 >
+                   <User className="w-4 h-4" />
+                   <span>Unassigned</span>
+                 </button>
+                 <button 
+                   onClick={() => setShowDateFilterModal(true)}
+                   className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium flex items-center space-x-1 border-2 border-green-500 hover:border-green-400"
+                 >
+                   <Calendar className="w-4 h-4" />
+                   <span>Date</span>
+                 </button>
+                 <button 
+                   onClick={handleDeleteClients}
+                   disabled={selectedClients.size === 0}
+                   className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center space-x-1"
+                 >
+                   <Trash2 className="w-4 h-4" />
+                   <span>Delete ({selectedClients.size})</span>
+                 </button>
+               </>
+             )}
+        </div>
+      </div>
 
       {/* Main Client Table */}
       <div className="mb-6">
