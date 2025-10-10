@@ -41,7 +41,7 @@ const Profile = () => {
     phone: user?.phone || '',
     bio: user?.bio || '',
     company: user?.company || 'CRM Platform',
-    title: user?.title || (user?.role === 'admin' ? 'Administrator' : 'Agent'),
+    title: user?.title || (user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'),
     location: user?.location || 'Remote',
     campaign: user?.campaign || 'Data'
   });
@@ -56,7 +56,7 @@ const Profile = () => {
         phone: user.phone || '',
         bio: user.bio || '',
         company: user.company || 'CRM Platform',
-        title: user.title || (user?.role === 'admin' ? 'Administrator' : 'Agent'),
+        title: user.title || (user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'),
         location: user.location || 'Remote',
         campaign: user.campaign || 'Data'
       });
@@ -119,7 +119,7 @@ const Profile = () => {
         phone: user.phone || '',
         bio: user.bio || '',
         company: user.company || 'CRM Platform',
-        title: user.title || (user?.role === 'admin' ? 'Administrator' : 'Agent'),
+        title: user.title || (user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'),
         location: user.location || 'Remote'
       });
     }

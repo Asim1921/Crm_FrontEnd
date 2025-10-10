@@ -27,9 +27,13 @@ export const canViewPhoneNumbers = (user) => {
 };
 
 export const canViewEmailAddresses = (user) => {
-  return isAdmin(user) || isTeamLeader(user);
+  return isAdmin(user);
 };
 
 export const canViewAllClients = (user) => {
+  return isAdmin(user) || isTeamLeader(user);
+};
+
+export const canSearchAllClients = (user) => {
   return isAdmin(user) || isTeamLeader(user);
 };

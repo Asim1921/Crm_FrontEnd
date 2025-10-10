@@ -243,7 +243,7 @@ const Header = ({ title, onMenuClick, isMobile }) => {
             <div className="flex flex-col">
               <h1 className="text-lg lg:text-xl font-bold text-gray-800">{title}</h1>
               <span className="bg-blue-100 text-blue-600 text-xs px-2 py-0.5 rounded-full font-medium">
-            {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+            {user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'}
           </span>
             </div>
           </div>
@@ -467,7 +467,7 @@ const Header = ({ title, onMenuClick, isMobile }) => {
                     {user?.firstName} {user?.lastName}
                   </span>
                   <span className="text-xs text-gray-500">
-                    {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+                    {user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'}
                   </span>
                 </div>
                 <ChevronDown className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400" />

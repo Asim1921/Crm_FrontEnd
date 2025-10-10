@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSearch } from '../context/SearchContext';
 import { useNavigate } from 'react-router-dom';
 import { reportsAPI, clientAPI, communicationAPI } from '../utils/api';
+import { canViewPhoneNumbers, canViewEmailAddresses } from '../utils/roleUtils';
 import { 
   Users, 
   Settings, 
@@ -964,13 +965,13 @@ const Dashboard = () => {
                   <label className="block text-sm font-medium text-gray-700">Name</label>
                   <p className="mt-1 text-sm text-gray-900">{selectedClient.firstName} {selectedClient.lastName}</p>
                 </div>
-                {user?.role === 'admin' && (
+                {canViewEmailAddresses(user) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Email</label>
                     <p className="mt-1 text-sm text-gray-900">{selectedClient.email}</p>
                   </div>
                 )}
-                {user?.role === 'admin' && (
+                {canViewPhoneNumbers(user) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Phone</label>
                     <p className="mt-1 text-sm text-gray-900">{selectedClient.phone}</p>

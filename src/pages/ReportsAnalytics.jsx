@@ -10,6 +10,7 @@ import {
   X
 } from 'lucide-react';
 import { reportsAPI } from '../utils/api';
+import { canViewPhoneNumbers } from '../utils/roleUtils';
 
 const ReportsAnalytics = () => {
   const { user } = useAuth();
@@ -481,7 +482,7 @@ const ReportsAnalytics = () => {
               </div>
               
               <div className="grid grid-cols-2 gap-4">
-                {user?.role === 'admin' && (
+                {canViewPhoneNumbers(user) && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                     <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{selectedClient.phone || 'N/A'}</p>

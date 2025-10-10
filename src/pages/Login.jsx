@@ -55,7 +55,7 @@ const Login = () => {
               <h1 className="text-lg lg:text-2xl font-bold text-gray-900">Logo</h1>
               <h2 className="text-base lg:text-xl font-bold text-gray-900">Dashboard</h2>
               <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full w-fit">
-                {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+                {user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'}
               </span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
@@ -81,7 +81,7 @@ const Login = () => {
                     {user?.firstName} {user?.lastName}
                   </p>
                   <p className="text-xs lg:text-sm text-gray-600">
-                    {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+                    {user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'}
                   </p>
                 </div>
               </div>

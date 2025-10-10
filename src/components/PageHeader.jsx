@@ -13,7 +13,7 @@ const PageHeader = ({ title, subtitle }) => {
             {subtitle && <p className="text-gray-600">{subtitle}</p>}
           </div>
           <span className="bg-orange-100 text-orange-600 text-xs px-2 py-1 rounded-full">
-            {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+            {user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'}
           </span>
         </div>
         <div className="flex items-center space-x-4">
@@ -40,7 +40,7 @@ const PageHeader = ({ title, subtitle }) => {
                 {user?.firstName} {user?.lastName}
               </p>
               <p className="text-xs text-gray-500">
-                {user?.role === 'admin' ? 'Administrator' : 'Agent'}
+                {user?.role === 'admin' ? 'Administrator' : user?.role === 'tl' ? 'Team Lead' : 'Agent'}
               </p>
             </div>
           </div>

@@ -69,7 +69,7 @@ export const AuthProvider = ({ children }) => {
           
           if (response.ok) {
             const user = await response.json();
-            console.log('User loaded successfully:', user.email);
+            console.log('User loaded successfully:', user.email, 'Role:', user.role);
             dispatch({
               type: 'LOGIN_SUCCESS',
               payload: { 

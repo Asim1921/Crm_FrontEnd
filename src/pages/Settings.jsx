@@ -721,6 +721,7 @@ const Settings = () => {
                     className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="agent">Agent</option>
+                    <option value="tl">Team Lead</option>
                     <option value="manager">Manager</option>
                   </select>
                 </div>

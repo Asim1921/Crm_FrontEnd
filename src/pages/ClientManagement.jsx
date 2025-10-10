@@ -3,6 +3,16 @@ import { clientAPI, reportsAPI } from '../utils/api';
 import { useNotifications } from '../context/NotificationContext';
 import { useAuth } from '../context/AuthContext';
 import { 
+  canViewPhoneNumbers, 
+  canViewEmailAddresses, 
+  canViewAllClients, 
+  canSearchAllClients,
+  canAssignClients,
+  canExportData,
+  isAdmin,
+  isTeamLeader
+} from '../utils/roleUtils';
+import { 
   Search, 
   Filter, 
   Plus, 
@@ -36,8 +46,6 @@ const ClientManagement = () => {
   const navigate = useNavigate();
   const { addClientNotification } = useNotifications();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const isTeamLeader = user?.role === 'tl';
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -1072,9 +1080,9 @@ const ClientManagement = () => {
     const telUrl = `tel:${phoneNumber}`;
     window.open(telUrl, '_self');
     
-         // Show success message (hide phone number for agents)
+         // Show success message (hide phone number for non-admins)
      setTimeout(() => {
-       if (user?.role === 'admin') {
+       if (canViewPhoneNumbers(user)) {
          alert(`Calling ${client.firstName} at ${client.phone}`);
        } else {
          alert(`Calling ${client.firstName}`);
@@ -1116,9 +1124,9 @@ const ClientManagement = () => {
       window.open(mailtoUrl, '_self');
     }
     
-         // Show success message (hide email for agents)
+         // Show success message (hide email for non-admins and non-team-leads)
      setTimeout(() => {
-       if (user?.role === 'admin') {
+       if (canViewEmailAddresses(user)) {
          alert(`${provider} opened for ${client.firstName} with pre-filled email`);
        } else {
          alert(`${provider} opened for ${client.firstName}`);
@@ -1254,7 +1262,7 @@ const ClientManagement = () => {
                 </option>
               ))}
             </select>
-            {(isAdmin || isTeamLeader) && (
+            {(isAdmin(user) || isTeamLeader(user)) && (
               <select 
                 value={agentFilter}
                 onChange={(e) => {
@@ -1279,7 +1287,7 @@ const ClientManagement = () => {
             )}
           </div>
         </div>
-        {isAdmin && (
+        {isAdmin(user) && (
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
             <button 
               onClick={() => {
@@ -1336,7 +1344,7 @@ const ClientManagement = () => {
       </div>
 
              {/* Assignment Bar - Only for Admins */}
-       {isAdmin && (
+       {isAdmin(user) && (
          <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-3 sm:space-y-0 mb-6 p-4 bg-white rounded-lg shadow-sm">
            <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
              <div className="flex items-center space-x-2">
@@ -1943,22 +1951,13 @@ const ClientManagement = () => {
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
-                                     {user?.role === 'admin' && (
+                                     {canViewPhoneNumbers(user) && (
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
                    )}
-                   {user?.role === 'admin' && (
+                   {canViewEmailAddresses(user) && (
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
                    )}
-                   {user?.role === 'agent' && (
-                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
-                   )}
-                   {user?.role === 'agent' && (
-                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
-                   )}
-                   {user?.role === 'tl' && (
-                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
-                   )}
-                  {(isAdmin || isTeamLeader) && (
+                  {(isAdmin(user) || isTeamLeader(user)) && (
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
                   )}
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
@@ -2035,22 +2034,13 @@ const ClientManagement = () => {
                         </div>
                       </td>
                      <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.country}</td>
-                                           {user?.role === 'admin' && (
+                                           {canViewPhoneNumbers(user) && (
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.phone}</td>
                       )}
-                      {user?.role === 'admin' && (
+                      {canViewEmailAddresses(user) && (
                         <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.email}</td>
                       )}
-                      {user?.role === 'agent' && (
-                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-400">••••••••••</td>
-                      )}
-                      {user?.role === 'agent' && (
-                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-400">••••••••••</td>
-                      )}
-                      {user?.role === 'tl' && (
-                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">{client.email}</td>
-                      )}
-                     {(isAdmin || isTeamLeader) && (
+                     {(isAdmin(user) || isTeamLeader(user)) && (
                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                          {client.assignedAgent ? (
                            <div className="flex items-center">
@@ -2107,7 +2097,7 @@ const ClientManagement = () => {
                            </div>
                            {client.lastCommentViewer && (
                              <div className="text-xs text-gray-400">
-                               Last viewed by {client.lastCommentViewer.role === 'admin' ? 'Administrator' : 'Agent'}
+                               Last viewed by {client.lastCommentViewer.role === 'admin' ? 'Administrator' : client.lastCommentViewer.role === 'tl' ? 'Team Lead' : 'Agent'}
                                {client.lastCommentViewer.viewedAt && (
                                  <span className="ml-1">
                                    • {new Date(client.lastCommentViewer.viewedAt).toLocaleString()}
