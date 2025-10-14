@@ -51,10 +51,10 @@ const ClientManagement = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [campaignFilter, setCampaignFilter] = useState('all');
-  const [countryFilter, setCountryFilter] = useState('all');
-  const [agentFilter, setAgentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState([]);
+  const [campaignFilter, setCampaignFilter] = useState([]);
+  const [countryFilter, setCountryFilter] = useState([]);
+  const [agentFilter, setAgentFilter] = useState([]);
   const [unassignedFilter, setUnassignedFilter] = useState(false);
   const [selectedClients, setSelectedClients] = useState(new Set());
   const [selectAll, setSelectAll] = useState(false);
@@ -62,10 +62,21 @@ const ClientManagement = () => {
   const [showCampaignFilter, setShowCampaignFilter] = useState(false);
   const [duplicateFilter, setDuplicateFilter] = useState(false);
   const [assignToAgent, setAssignToAgent] = useState('');
+  const [showStatusHeaderDropdown, setShowStatusHeaderDropdown] = useState(false);
+  const [showCampaignHeaderDropdown, setShowCampaignHeaderDropdown] = useState(false);
+  const [showCountryHeaderDropdown, setShowCountryHeaderDropdown] = useState(false);
+  const [showAgentHeaderDropdown, setShowAgentHeaderDropdown] = useState(false);
+  const [showDateOptionsDropdown, setShowDateOptionsDropdown] = useState(false);
+  const [dateSortType, setDateSortType] = useState('entry'); // 'entry' or 'comment'
   const [showSelectAllDropdown, setShowSelectAllDropdown] = useState(false);
   const statusFilterRef = useRef(null);
   const campaignFilterRef = useRef(null);
   const selectAllDropdownRef = useRef(null);
+  const statusHeaderDropdownRef = useRef(null);
+  const campaignHeaderDropdownRef = useRef(null);
+  const countryHeaderDropdownRef = useRef(null);
+  const agentHeaderDropdownRef = useRef(null);
+  const dateOptionsDropdownRef = useRef(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     current: 1,
@@ -210,16 +221,20 @@ const ClientManagement = () => {
     try {
       const params = {
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
-        ...(countryFilter !== 'all' && { country: countryFilter }),
-        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        ...(statusFilter.length > 0 && { status: statusFilter }),
+        ...(campaignFilter.length > 0 && { campaign: campaignFilter }),
+        ...(countryFilter.length > 0 && { country: countryFilter }),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter.length > 0 && { agent: agentFilter })),
         // Date filtering based on type
         ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
         ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
         ...(dateNavigationType === 'comment' && dateFilter && { commentDate: dateFilter }),
         ...(dateNavigationType === 'comment' && endDateFilter && { endCommentDate: endDateFilter }),
         ...(dateFilter && { dateFilterType: dateNavigationType }),
+        // Date sorting
+        ...(dateSortType && { dateSortType }),
+        // Date sorting
+        ...(dateSortType && { dateSortType }),
         ...(unassignedFilter && { unassigned: true })
       };
 
@@ -242,12 +257,12 @@ const ClientManagement = () => {
         page: duplicateFilter ? 1 : currentPage,
         limit: duplicateFilter ? 1000 : 50, // Fetch all clients for duplicate detection
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
-        ...(countryFilter !== 'all' && { country: countryFilter }),
+        ...(statusFilter.length > 0 && { status: statusFilter }),
+        ...(campaignFilter.length > 0 && { campaign: campaignFilter }),
+        ...(countryFilter.length > 0 && { country: countryFilter }),
         // For agents, automatically filter to only their assigned clients
         // For TL, allow filtering by agent but don't restrict by default
-        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter.length > 0 && { agent: agentFilter })),
         // Unassigned filter
         ...(unassignedFilter && { unassigned: true }),
         // Date filtering based on type
@@ -255,7 +270,9 @@ const ClientManagement = () => {
         ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
         ...(dateNavigationType === 'comment' && dateFilter && { commentDate: dateFilter }),
         ...(dateNavigationType === 'comment' && endDateFilter && { endCommentDate: endDateFilter }),
-        ...(dateFilter && { dateFilterType: dateNavigationType })
+        ...(dateFilter && { dateFilterType: dateNavigationType }),
+        // Date sorting
+        ...(dateSortType && { dateSortType })
       };
       
       // Debug logging for date filtering
@@ -304,12 +321,12 @@ const ClientManagement = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentPage, debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, duplicateFilter, dateFilter, endDateFilter, dateNavigationType]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, duplicateFilter, dateFilter, endDateFilter, dateNavigationType, dateSortType]);
 
   // Fetch global analytics whenever filters change (but not pagination)
   useEffect(() => {
     fetchGlobalAnalytics();
-  }, [debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType]);
+  }, [debouncedSearchTerm, statusFilter, campaignFilter, countryFilter, agentFilter, unassignedFilter, dateFilter, endDateFilter, dateNavigationType, dateSortType]);
 
   // Fetch available agents and countries
   useEffect(() => {
@@ -341,6 +358,21 @@ const ClientManagement = () => {
       if (selectAllDropdownRef.current && !selectAllDropdownRef.current.contains(event.target)) {
         setShowSelectAllDropdown(false);
       }
+      if (statusHeaderDropdownRef.current && !statusHeaderDropdownRef.current.contains(event.target)) {
+        setShowStatusHeaderDropdown(false);
+      }
+      if (campaignHeaderDropdownRef.current && !campaignHeaderDropdownRef.current.contains(event.target)) {
+        setShowCampaignHeaderDropdown(false);
+      }
+      if (countryHeaderDropdownRef.current && !countryHeaderDropdownRef.current.contains(event.target)) {
+        setShowCountryHeaderDropdown(false);
+      }
+      if (agentHeaderDropdownRef.current && !agentHeaderDropdownRef.current.contains(event.target)) {
+        setShowAgentHeaderDropdown(false);
+      }
+      if (dateOptionsDropdownRef.current && !dateOptionsDropdownRef.current.contains(event.target)) {
+        setShowDateOptionsDropdown(false);
+      }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -369,13 +401,29 @@ const ClientManagement = () => {
 
   // Handle lead status overview clicks
   const handleLeadStatusClick = (status) => {
-    setStatusFilter(status);
+    setStatusFilter(prev => {
+      if (prev.includes(status)) {
+        // Remove if already selected
+        return prev.filter(s => s !== status);
+      } else {
+        // Add if not selected
+        return [...prev, status];
+      }
+    });
     setCurrentPage(1);
   };
 
   // Handle campaign overview clicks
   const handleCampaignClick = (campaign) => {
-    setCampaignFilter(campaign);
+    setCampaignFilter(prev => {
+      if (prev.includes(campaign)) {
+        // Remove if already selected
+        return prev.filter(c => c !== campaign);
+      } else {
+        // Add if not selected
+        return [...prev, campaign];
+      }
+    });
     setCurrentPage(1);
   };
 
@@ -386,10 +434,10 @@ const ClientManagement = () => {
       const params = {
         limit: 10000, // Large number to get all clients
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
-        ...(countryFilter !== 'all' && { country: countryFilter }),
-        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        ...(statusFilter.length > 0 && { status: statusFilter }),
+        ...(campaignFilter.length > 0 && { campaign: campaignFilter }),
+        ...(countryFilter.length > 0 && { country: countryFilter }),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter.length > 0 && { agent: agentFilter })),
         ...(unassignedFilter && { unassigned: true }),
         ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
         ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
@@ -618,10 +666,10 @@ const ClientManagement = () => {
         page: duplicateFilter ? 1 : currentPage,
         limit: duplicateFilter ? 1000 : 50,
         ...(debouncedSearchTerm && { search: debouncedSearchTerm }),
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(campaignFilter !== 'all' && { campaign: campaignFilter }),
-        ...(countryFilter !== 'all' && { country: countryFilter }),
-        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter !== 'all' && { agent: agentFilter })),
+        ...(statusFilter.length > 0 && { status: statusFilter }),
+        ...(campaignFilter.length > 0 && { campaign: campaignFilter }),
+        ...(countryFilter.length > 0 && { country: countryFilter }),
+        ...(user?.role === 'agent' ? { agent: user._id } : (agentFilter.length > 0 && { agent: agentFilter })),
         ...(unassignedFilter && { unassigned: true }),
         ...(dateNavigationType === 'entry' && dateFilter && { registrationDate: dateFilter }),
         ...(dateNavigationType === 'entry' && endDateFilter && { endRegistrationDate: endDateFilter }),
@@ -745,6 +793,71 @@ const ClientManagement = () => {
       console.error('Error assigning clients:', err);
       alert('Failed to assign clients: ' + (err.message || 'Unknown error'));
     }
+  };
+
+  // Toggle status header dropdown
+  const toggleStatusHeaderDropdown = () => {
+    setShowStatusHeaderDropdown(prev => !prev);
+  };
+
+  // Toggle campaign header dropdown
+  const toggleCampaignHeaderDropdown = () => {
+    setShowCampaignHeaderDropdown(prev => !prev);
+  };
+
+  // Toggle country header dropdown
+  const toggleCountryHeaderDropdown = () => {
+    setShowCountryHeaderDropdown(prev => !prev);
+  };
+
+  // Toggle agent header dropdown
+  const toggleAgentHeaderDropdown = () => {
+    setShowAgentHeaderDropdown(prev => !prev);
+  };
+
+  // Toggle date options dropdown
+  const toggleDateOptionsDropdown = () => {
+    setShowDateOptionsDropdown(prev => !prev);
+  };
+
+  // Handle date sorting (newest first)
+  const handleDateSortNewest = () => {
+    setDateSortType('entry');
+    // Clear any existing date filters and sort by newest entry date
+    setDateFilter('');
+    setEndDateFilter('');
+    setCurrentPage(1);
+    // The sorting will be handled by the API call
+  };
+
+  // Handle date sorting (oldest first)
+  const handleDateSortOldest = () => {
+    setDateSortType('entry');
+    // Clear any existing date filters and sort by oldest entry date
+    setDateFilter('');
+    setEndDateFilter('');
+    setCurrentPage(1);
+    // The sorting will be handled by the API call
+  };
+
+  // Handle comment date sorting (newest first)
+  const handleCommentSortNewest = () => {
+    setDateSortType('comment');
+    // Clear any existing date filters and sort by newest comment date
+    setDateFilter('');
+    setEndDateFilter('');
+    setCurrentPage(1);
+    // The sorting will be handled by the API call
+  };
+
+  // Handle comment date sorting (oldest first)
+  const handleCommentSortOldest = () => {
+    setDateSortType('comment');
+    // Clear any existing date filters and sort by oldest comment date
+    setDateFilter('');
+    setEndDateFilter('');
+    setCurrentPage(1);
+    // The sorting will be handled by the API call
   };
 
   // Handle delete selected clients
@@ -1250,41 +1363,6 @@ const ClientManagement = () => {
             />
           </div>
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
-            <select 
-              value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">All Countries</option>
-              {availableCountries.map((country) => (
-                <option key={country} value={country}>
-                  {country}
-                </option>
-              ))}
-            </select>
-            {(isAdmin(user) || isTeamLeader(user)) && (
-              <select 
-                value={agentFilter}
-                onChange={(e) => {
-                  setAgentFilter(e.target.value);
-                  // Reset unassigned filter when agent filter is changed
-                  if (e.target.value !== 'all') {
-                    setUnassignedFilter(false);
-                  }
-                }}
-                disabled={unassignedFilter}
-                className={`px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm ${
-                  unassignedFilter ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
-              >
-                <option value="all">All Agents</option>
-                {availableAgents.map((agent) => (
-                  <option key={agent._id} value={agent._id}>
-                    {agent.firstName} {agent.lastName}
-                  </option>
-                ))}
-              </select>
-            )}
           </div>
         </div>
         {isAdmin(user) && (
@@ -1456,315 +1534,7 @@ const ClientManagement = () => {
             </button>
           )}
           
-          {/* Search by Status Button */}
-          <div className="relative" ref={statusFilterRef}>
-            <button 
-              onClick={() => setShowStatusFilter(!showStatusFilter)}
-              className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
-                statusFilter !== 'all' 
-                  ? 'bg-red-600 hover:bg-red-700' 
-                  : 'bg-gray-600 hover:bg-gray-700'
-              }`}
-            >
-              <Filter className="w-4 h-4" />
-              <span>Status</span>
-            </button>
-               
-               {/* Status Filter Dropdown */}
-               {showStatusFilter && (
-                 <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                   <div className="py-1">
-                     <button
-                       onClick={() => {
-                         setStatusFilter('all');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       All Statuses
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('New Lead');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'New Lead' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       New Lead
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('Call Again');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'Call Again' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Call Again
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('Not Interested');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'Not Interested' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Not Interested
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('Hang Up');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'Hang Up' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Hang Up
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('NA5UP');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'NA5UP' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       NA5UP
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('No Answer');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'No Answer' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       No Answer
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('Wrong Number');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'Wrong Number' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Wrong Number
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('Wrong Name');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'Wrong Name' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Wrong Name
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('FTD');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'FTD' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       FTD
-                     </button>
-                     <button
-                       onClick={() => {
-                         setStatusFilter('FTD RETENTION');
-                         setShowStatusFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         statusFilter === 'FTD RETENTION' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       FTD RETENTION
-                     </button>
-                   </div>
-                 </div>
-               )}
-             </div>
              
-             {/* Campaign Filter Button */}
-             <div className="relative" ref={campaignFilterRef}>
-               <button 
-                 onClick={() => setShowCampaignFilter(!showCampaignFilter)}
-                 className={`px-3 py-2 text-white rounded-lg text-sm font-medium flex items-center space-x-1 transition-colors ${
-                   campaignFilter !== 'all' 
-                     ? 'bg-red-600 hover:bg-red-700' 
-                     : 'bg-gray-600 hover:bg-gray-700'
-                 }`}
-               >
-                 <Filter className="w-4 h-4" />
-                 <span>Campaign</span>
-               </button>
-               
-               {/* Campaign Filter Dropdown */}
-               {showCampaignFilter && (
-                 <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                   <div className="py-1">
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('all');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'all' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       All Campaigns
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Data');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Data' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Data
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Data2');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Data2' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Data2
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Data3');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Data3' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Data3
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('camping No Interest Rete');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'camping No Interest Rete' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       camping No Interest Rete
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('DataR');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'DataR' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       DataR
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Data2R');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Data2R' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Data2R
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('AffiliateR');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'AffiliateR' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       AffiliateR
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Data4');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Data4' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Data4
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Data5');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Data5' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Data5
-                     </button>
-                     <button
-                       onClick={() => {
-                         setCampaignFilter('Affiliate');
-                         setShowCampaignFilter(false);
-                         setCurrentPage(1);
-                       }}
-                       className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
-                         campaignFilter === 'Affiliate' ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                       }`}
-                     >
-                       Affiliate
-                     </button>
-                   </div>
-                 </div>
-               )}
-             </div>
              
              {/* Admin-only filter buttons */}
              {isAdmin(user) && (
@@ -1784,7 +1554,7 @@ const ClientManagement = () => {
                      setUnassignedFilter(!unassignedFilter);
                      // Reset agent filter when unassigned filter is activated
                      if (!unassignedFilter) {
-                       setAgentFilter('all');
+                       setAgentFilter([]);
                      }
                      setCurrentPage(1); // Reset to first page when filter changes
                    }}
@@ -1960,7 +1730,75 @@ const ClientManagement = () => {
                   </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">COUNTRY</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="relative" ref={countryHeaderDropdownRef}>
+                      <button
+                        onClick={toggleCountryHeaderDropdown}
+                        className={`flex items-center space-x-2 hover:bg-gray-100 rounded px-2 py-1 transition-colors ${
+                          countryFilter.length > 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-500'
+                        }`}
+                      >
+                        <span>COUNTRY</span>
+                        <Filter className="w-3 h-3" />
+                      </button>
+                      
+                      {showCountryHeaderDropdown && (
+                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setCountryFilter([]);
+                                setCurrentPage(1);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                countryFilter.length === 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={countryFilter.length === 0}
+                                readOnly
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span>All Countries</span>
+                            </button>
+                            {availableCountries.length > 0 ? (
+                              availableCountries.map((country) => (
+                                <button
+                                  key={country}
+                                  onClick={() => {
+                                    setCountryFilter(prev => {
+                                      if (prev.includes(country)) {
+                                        return prev.filter(c => c !== country);
+                                      } else {
+                                        return [...prev, country];
+                                      }
+                                    });
+                                    setCurrentPage(1);
+                                  }}
+                                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                    countryFilter.includes(country) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={countryFilter.includes(country)}
+                                    readOnly
+                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  />
+                                  <span>{country}</span>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="px-3 py-4 text-center text-sm text-gray-500">
+                                No countries available
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                                      {canViewPhoneNumbers(user) && (
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PHONE</th>
                    )}
@@ -1968,57 +1806,415 @@ const ClientManagement = () => {
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
                    )}
                   {(isAdmin(user) || isTeamLeader(user)) && (
-                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ASSIGNED AGENT</th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <div className="relative" ref={agentHeaderDropdownRef}>
+                        <button
+                          onClick={toggleAgentHeaderDropdown}
+                          className={`flex items-center space-x-2 hover:bg-gray-100 rounded px-2 py-1 transition-colors ${
+                            agentFilter.length > 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-500'
+                          }`}
+                        >
+                          <span>ASSIGNED AGENT</span>
+                          <Filter className="w-3 h-3" />
+                        </button>
+                        
+                        {showAgentHeaderDropdown && (
+                          <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                            <div className="py-1">
+                              <button
+                                onClick={() => {
+                                  setAgentFilter([]);
+                                  setCurrentPage(1);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                  agentFilter.length === 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={agentFilter.length === 0}
+                                  readOnly
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <span>All Agents</span>
+                              </button>
+                              {availableAgents.length > 0 ? (
+                                availableAgents.map((agent) => (
+                                  <button
+                                    key={agent._id}
+                                    onClick={() => {
+                                      setAgentFilter(prev => {
+                                        if (prev.includes(agent._id)) {
+                                          return prev.filter(a => a !== agent._id);
+                                        } else {
+                                          return [...prev, agent._id];
+                                        }
+                                      });
+                                      setCurrentPage(1);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                      agentFilter.includes(agent._id) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={agentFilter.includes(agent._id)}
+                                      readOnly
+                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                    />
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${getAvatarColor(agent.firstName)}`}>
+                                      {getInitials(agent.firstName, agent.lastName)}
+                                    </div>
+                                    <span>{agent.firstName} {agent.lastName}</span>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-3 py-4 text-center text-sm text-gray-500">
+                                  No agents available
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </th>
                   )}
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STATUS</th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CAMPAIGN</th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="relative" ref={statusHeaderDropdownRef}>
+                      <button
+                        onClick={toggleStatusHeaderDropdown}
+                        className={`flex items-center space-x-2 hover:bg-gray-100 rounded px-2 py-1 transition-colors ${
+                          statusFilter.length > 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-500'
+                        }`}
+                      >
+                        <span>STATUS</span>
+                        <Filter className="w-3 h-3" />
+                      </button>
+                      
+                      {showStatusHeaderDropdown && (
+                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setStatusFilter([]);
+                                setCurrentPage(1);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                statusFilter.length === 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={statusFilter.length === 0}
+                                readOnly
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span>All Statuses</span>
+                            </button>
+                            {[
+                              'New Lead', 'FTD', 'FTD RETENTION', 'Call Again', 'No Answer', 
+                              'NA5UP', 'Not Interested', 'Hang Up', 'Wrong Number', 'Wrong Name'
+                            ].map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => {
+                                  setStatusFilter(prev => {
+                                    if (prev.includes(status)) {
+                                      return prev.filter(s => s !== status);
+                                    } else {
+                                      return [...prev, status];
+                                    }
+                                  });
+                                  setCurrentPage(1);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                  statusFilter.includes(status) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={statusFilter.includes(status)}
+                                  readOnly
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <div className={`w-3 h-3 rounded-full ${
+                                  status === 'New Lead' ? 'bg-green-500' :
+                                  status === 'FTD' ? 'bg-blue-500' :
+                                  status === 'FTD RETENTION' ? 'bg-indigo-500' :
+                                  status === 'Call Again' ? 'bg-orange-500' :
+                                  status === 'No Answer' ? 'bg-pink-500' :
+                                  status === 'NA5UP' ? 'bg-teal-500' :
+                                  status === 'Not Interested' ? 'bg-gray-500' :
+                                  status === 'Hang Up' ? 'bg-purple-500' :
+                                  status === 'Wrong Number' ? 'bg-red-500' :
+                                  status === 'Wrong Name' ? 'bg-amber-500' :
+                                  'bg-gray-400'
+                                }`}></div>
+                                <span>{status}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="relative" ref={campaignHeaderDropdownRef}>
+                      <button
+                        onClick={toggleCampaignHeaderDropdown}
+                        className={`flex items-center space-x-2 hover:bg-gray-100 rounded px-2 py-1 transition-colors ${
+                          campaignFilter.length > 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-500'
+                        }`}
+                      >
+                        <span>CAMPAIGN</span>
+                        <Filter className="w-3 h-3" />
+                      </button>
+                      
+                      {showCampaignHeaderDropdown && (
+                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          <div className="py-1">
+                            <button
+                              onClick={() => {
+                                setCampaignFilter([]);
+                                setCurrentPage(1);
+                              }}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                campaignFilter.length === 0 ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={campaignFilter.length === 0}
+                                readOnly
+                                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              />
+                              <span>All Campaigns</span>
+                            </button>
+                            {[
+                              'Data', 'Data2', 'Data3', 'Data4', 'Data5', 'Affiliate', 
+                              'camping No Interest Rete', 'DataR', 'Data2R', 'AffiliateR'
+                            ].map((campaign) => (
+                              <button
+                                key={campaign}
+                                onClick={() => {
+                                  setCampaignFilter(prev => {
+                                    if (prev.includes(campaign)) {
+                                      return prev.filter(c => c !== campaign);
+                                    } else {
+                                      return [...prev, campaign];
+                                    }
+                                  });
+                                  setCurrentPage(1);
+                                }}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2 ${
+                                  campaignFilter.includes(campaign) ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={campaignFilter.includes(campaign)}
+                                  readOnly
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                />
+                                <div className={`w-3 h-3 rounded-full ${
+                                  campaign === 'Data' ? 'bg-indigo-500' :
+                                  campaign === 'Data2' ? 'bg-purple-500' :
+                                  campaign === 'Data3' ? 'bg-pink-500' :
+                                  campaign === 'Data4' ? 'bg-yellow-500' :
+                                  campaign === 'Data5' ? 'bg-orange-500' :
+                                  campaign === 'Affiliate' ? 'bg-teal-500' :
+                                  campaign === 'camping No Interest Rete' ? 'bg-red-500' :
+                                  campaign === 'DataR' ? 'bg-indigo-600' :
+                                  campaign === 'Data2R' ? 'bg-purple-600' :
+                                  campaign === 'AffiliateR' ? 'bg-teal-600' :
+                                  'bg-gray-400'
+                                }`}></div>
+                                <span>{campaign}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center justify-between">
                       <span>CRM ENTRY DATE</span>
-                      <div className="flex flex-col ml-2">
-                        <button
-                          onClick={() => navigateDate('prev', 'entry')}
-                          className="hover:bg-gray-100 rounded p-1"
-                          title="Previous day"
-                        >
-                          <ChevronUp className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => navigateDate('next', 'entry')}
-                          className="hover:bg-gray-100 rounded p-1"
-                          title="Next day"
-                        >
-                          <ChevronDown className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                        </button>
+                      <div className="flex items-center space-x-1">
+                        <div className="relative" ref={dateOptionsDropdownRef}>
+                          <button
+                            onClick={toggleDateOptionsDropdown}
+                            className="hover:bg-gray-100 rounded p-1"
+                            title="Date options"
+                          >
+                            <Calendar className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                          </button>
+                          
+                          {showDateOptionsDropdown && (
+                            <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                              <div className="py-1">
+                                <div className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100">
+                                  Sort by Date
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    handleDateSortNewest();
+                                    setShowDateOptionsDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2"
+                                >
+                                  <ChevronUp className="w-3 h-3 text-green-500" />
+                                  <span>Newest Entry First</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleDateSortOldest();
+                                    setShowDateOptionsDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2"
+                                >
+                                  <ChevronDown className="w-3 h-3 text-blue-500" />
+                                  <span>Oldest Entry First</span>
+                                </button>
+                                <div className="px-3 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-100 mt-1">
+                                  Sort by Comment
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    handleCommentSortNewest();
+                                    setShowDateOptionsDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2"
+                                >
+                                  <ChevronUp className="w-3 h-3 text-green-500" />
+                                  <span>Newest Comment First</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    handleCommentSortOldest();
+                                    setShowDateOptionsDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2"
+                                >
+                                  <ChevronDown className="w-3 h-3 text-blue-500" />
+                                  <span>Oldest Comment First</span>
+                                </button>
+                                <div className="border-t border-gray-100 mt-1"></div>
+                                <button
+                                  onClick={() => {
+                                    setShowDateFilterModal(true);
+                                    setShowDateOptionsDropdown(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 flex items-center space-x-2"
+                                >
+                                  <Calendar className="w-3 h-3 text-gray-500" />
+                                  <span>Filter by Date Range</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => {
+                              handleDateSortNewest();
+                            }}
+                            className="hover:bg-gray-100 rounded p-1"
+                            title="Newest entries first"
+                          >
+                            <ChevronUp className="w-3 h-3 text-gray-400 hover:text-green-600" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleDateSortOldest();
+                            }}
+                            className="hover:bg-gray-100 rounded p-1"
+                            title="Oldest entries first"
+                          >
+                            <ChevronDown className="w-3 h-3 text-gray-400 hover:text-blue-600" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     <div className="flex items-center justify-between">
                       <span>LATEST COMMENT</span>
-                      <div className="flex flex-col ml-2">
-                        <button
-                          onClick={() => navigateDate('prev', 'comment')}
-                          className="hover:bg-gray-100 rounded p-1"
-                          title="Previous day"
-                        >
-                          <ChevronUp className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => navigateDate('next', 'comment')}
-                          className="hover:bg-gray-100 rounded p-1"
-                          title="Next day"
-                        >
-                          <ChevronDown className="w-3 h-3 text-gray-400 hover:text-gray-600" />
-                        </button>
+                      <div className="flex items-center space-x-1">
+                        <div className="relative">
+                          <button
+                            onClick={() => {
+                              setShowDateFilterModal(true);
+                              setDateNavigationType('comment');
+                            }}
+                            className="hover:bg-gray-100 rounded p-1"
+                            title="Filter by comment date"
+                          >
+                            <Calendar className="w-3 h-3 text-gray-400 hover:text-gray-600" />
+                          </button>
+                        </div>
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => {
+                              handleCommentSortNewest();
+                            }}
+                            className="hover:bg-gray-100 rounded p-1"
+                            title="Newest comments first"
+                          >
+                            <ChevronUp className="w-3 h-3 text-gray-400 hover:text-green-600" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              handleCommentSortOldest();
+                            }}
+                            className="hover:bg-gray-100 rounded p-1"
+                            title="Oldest comments first"
+                          >
+                            <ChevronDown className="w-3 h-3 text-gray-400 hover:text-blue-600" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {clients.map((client) => (
-                  <tr key={client._id} className="hover:bg-gray-50">
+                {clients.length === 0 ? (
+                  <tr>
+                    <td colSpan="100%" className="px-4 lg:px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center space-y-3">
+                        <Users className="w-12 h-12 text-gray-400" />
+                        <div className="text-gray-500">
+                          <p className="text-lg font-medium">No clients found</p>
+                          <p className="text-sm mt-1">
+                            {(statusFilter.length > 0 || campaignFilter.length > 0 || countryFilter.length > 0 || agentFilter.length > 0 || debouncedSearchTerm || dateFilter) 
+                              ? 'Try adjusting your filters to see more results' 
+                              : 'No clients available in the system'}
+                          </p>
+                        </div>
+                        {(statusFilter.length > 0 || campaignFilter.length > 0 || countryFilter.length > 0 || agentFilter.length > 0 || debouncedSearchTerm || dateFilter) && (
+                          <button
+                            onClick={() => {
+                              setStatusFilter([]);
+                              setCampaignFilter([]);
+                              setCountryFilter([]);
+                              setAgentFilter([]);
+                              setSearchTerm('');
+                              setDateFilter('');
+                              setEndDateFilter('');
+                              setCurrentPage(1);
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+                          >
+                            Clear All Filters
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  clients.map((client) => (
+                    <tr key={client._id} className="hover:bg-gray-50">
                     <td className="px-4 lg:px-6 py-4">
                       <input 
                         type="checkbox" 
@@ -2053,14 +2249,14 @@ const ClientManagement = () => {
                      {(isAdmin(user) || isTeamLeader(user)) && (
                        <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-xs lg:text-sm text-gray-900">
                          {client.assignedAgent ? (
-                           <div className="flex items-center">
+                           <div className="flex items-center space-x-2">
                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium ${getAvatarColor(client.assignedAgent.firstName)}`}>
                                {getInitials(client.assignedAgent.firstName, client.assignedAgent.lastName)}
                              </div>
-                             <span className="ml-2">{client.assignedAgent.firstName} {client.assignedAgent.lastName}</span>
+                             <span className="text-sm">{client.assignedAgent.firstName} {client.assignedAgent.lastName}</span>
                            </div>
                          ) : (
-                           <span className="text-gray-400">Unassigned</span>
+                           <span className="text-gray-400 text-sm">Unassigned</span>
                          )}
                        </td>
                      )}
@@ -2122,7 +2318,8 @@ const ClientManagement = () => {
                        )}
                      </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -2242,7 +2439,7 @@ const ClientManagement = () => {
                <div className="flex items-center space-x-4">
                  <div className="text-sm text-gray-600">
                    Showing data for {dynamicAnalytics.totalClients} filtered client{dynamicAnalytics.totalClients !== 1 ? 's' : ''}
-                   {(agentFilter !== 'all' || statusFilter !== 'all' || countryFilter !== 'all' || debouncedSearchTerm) && (
+                   {(agentFilter.length > 0 || statusFilter.length > 0 || countryFilter.length > 0 || debouncedSearchTerm) && (
                      <span className="ml-2 text-blue-600">• Filtered View</span>
                    )}
                  </div>
@@ -2268,15 +2465,15 @@ const ClientManagement = () => {
             <div className="flex justify-between items-center mb-4">
               <div>
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900">Clients by Campaign Status</h3>
-                {campaignFilter !== 'all' && (
+                {campaignFilter.length > 0 && (
                   <p className="text-xs text-blue-600 mt-1">
-                    Showing data for: {campaignFilter}
+                    Showing data for: {campaignFilter.join(', ')}
                   </p>
                 )}
               </div>
-              {campaignFilter !== 'all' && (
+              {campaignFilter.length > 0 && (
                 <button
-                  onClick={() => setCampaignFilter('all')}
+                  onClick={() => setCampaignFilter([])}
                   className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Clear Filter
@@ -2315,10 +2512,10 @@ const ClientManagement = () => {
                   </div>
                   <div className="w-1/3 pl-4">
                     <div className="space-y-2">
-                      {campaignFilter !== 'all' && (
+                      {campaignFilter.length > 0 && (
                         <div 
                           className="flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors hover:bg-gray-50"
-                          onClick={() => setCampaignFilter('all')}
+                          onClick={() => setCampaignFilter([])}
                         >
                           <div className="flex items-center">
                             <div className="w-3 h-3 rounded-full mr-3 bg-gray-400"></div>
@@ -2333,7 +2530,7 @@ const ClientManagement = () => {
                         <div 
                           key={item._id} 
                           className={`flex items-center justify-between text-sm cursor-pointer p-2 rounded-lg transition-colors ${
-                            campaignFilter === item._id 
+                            campaignFilter.includes(item._id) 
                               ? 'bg-blue-50 border border-blue-200' 
                               : 'hover:bg-gray-50'
                           }`}
@@ -2372,15 +2569,18 @@ const ClientManagement = () => {
            <div className="flex justify-between items-center mb-4">
              <div>
                <h3 className="text-base lg:text-lg font-semibold text-gray-900">Lead Status Overview</h3>
-               {agentFilter !== 'all' && (
+               {agentFilter.length > 0 && (
                  <p className="text-xs text-blue-600 mt-1">
-                   Showing data for: {availableAgents.find(a => a._id === agentFilter)?.firstName} {availableAgents.find(a => a._id === agentFilter)?.lastName}
+                   Showing data for: {agentFilter.map(agentId => {
+                     const agent = availableAgents.find(a => a._id === agentId);
+                     return agent ? `${agent.firstName} ${agent.lastName}` : '';
+                   }).filter(Boolean).join(', ')}
                  </p>
                )}
              </div>
-             {statusFilter !== 'all' && (
+             {statusFilter.length > 0 && (
                <button
-                 onClick={() => setStatusFilter('all')}
+                 onClick={() => setStatusFilter([])}
                  className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                >
                  Clear Filter
@@ -2388,10 +2588,10 @@ const ClientManagement = () => {
              )}
            </div>
            <div className="space-y-3">
-             {statusFilter !== 'all' && (
+             {statusFilter.length > 0 && (
                <div 
                  className="flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors hover:bg-gray-50"
-                 onClick={() => setStatusFilter('all')}
+                 onClick={() => setStatusFilter([])}
                >
                  <div className="flex items-center">
                    <div className="w-3 h-3 rounded-full mr-3 bg-gray-400"></div>
@@ -2406,7 +2606,7 @@ const ClientManagement = () => {
                <div 
                  key={status._id} 
                  className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
-                   statusFilter === status._id 
+                   statusFilter.includes(status._id) 
                      ? 'bg-blue-50 border border-blue-200' 
                      : 'hover:bg-gray-50'
                  }`}
@@ -2426,11 +2626,11 @@ const ClientManagement = () => {
                      status._id === 'Wrong Name' ? 'bg-amber-500' :
                      'bg-gray-400'
                    }`}></div>
-                   <span className={`text-sm ${statusFilter === status._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                   <span className={`text-sm ${statusFilter.includes(status._id) ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
                      {status._id}
                    </span>
                  </div>
-                 <span className={`text-sm font-medium ${statusFilter === status._id ? 'text-blue-700' : 'text-gray-900'}`}>
+                 <span className={`text-sm font-medium ${statusFilter.includes(status._id) ? 'text-blue-700' : 'text-gray-900'}`}>
                    {status.count}
                  </span>
                </div>
@@ -2438,7 +2638,7 @@ const ClientManagement = () => {
                <div className="text-center py-6">
                  <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                  <p className="text-sm text-gray-500">
-                   {agentFilter !== 'all' ? 'No status data for selected agent' : 'No status data to display'}
+                   {agentFilter.length > 0 ? 'No status data for selected agent(s)' : 'No status data to display'}
                  </p>
                </div>
              )}
@@ -2446,38 +2646,38 @@ const ClientManagement = () => {
              {/* Campaign Options - Data and Affiliate */}
              <div 
                className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
-                 statusFilter === 'Data' 
+                 campaignFilter.includes('Data') 
                    ? 'bg-indigo-50 border border-indigo-200' 
                    : 'hover:bg-gray-50'
                }`}
-               onClick={() => handleLeadStatusClick('Data')}
+               onClick={() => handleCampaignClick('Data')}
              >
                <div className="flex items-center">
                  <div className="w-3 h-3 rounded-full mr-3 bg-indigo-500"></div>
-                 <span className={`text-sm ${statusFilter === 'Data' ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}>
+                 <span className={`text-sm ${campaignFilter.includes('Data') ? 'text-indigo-700 font-medium' : 'text-gray-700'}`}>
                    Data
                  </span>
                </div>
-               <span className={`text-sm font-medium ${statusFilter === 'Data' ? 'text-indigo-700' : 'text-gray-900'}`}>
+               <span className={`text-sm font-medium ${campaignFilter.includes('Data') ? 'text-indigo-700' : 'text-gray-900'}`}>
                  {globalAnalytics.campaignOverview?.find(c => c._id === 'Data')?.count || 0}
                </span>
              </div>
              
              <div 
                className={`flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors ${
-                 statusFilter === 'Affiliate' 
+                 campaignFilter.includes('Affiliate') 
                    ? 'bg-teal-50 border border-teal-200' 
                    : 'hover:bg-gray-50'
                }`}
-               onClick={() => handleLeadStatusClick('Affiliate')}
+               onClick={() => handleCampaignClick('Affiliate')}
              >
                <div className="flex items-center">
                  <div className="w-3 h-3 rounded-full mr-3 bg-teal-500"></div>
-                 <span className={`text-sm ${statusFilter === 'Affiliate' ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>
+                 <span className={`text-sm ${campaignFilter.includes('Affiliate') ? 'text-teal-700 font-medium' : 'text-gray-700'}`}>
                    Affiliate
                  </span>
                </div>
-               <span className={`text-sm font-medium ${statusFilter === 'Affiliate' ? 'text-teal-700' : 'text-gray-900'}`}>
+               <span className={`text-sm font-medium ${campaignFilter.includes('Affiliate') ? 'text-teal-700' : 'text-gray-900'}`}>
                  {globalAnalytics.campaignOverview?.find(c => c._id === 'Affiliate')?.count || 0}
                </span>
              </div>
