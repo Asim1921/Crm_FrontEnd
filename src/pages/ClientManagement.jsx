@@ -507,7 +507,20 @@ const ClientManagement = () => {
   };
 
   // Handle left-click on client name
-  const handleClientNameClick = (e, clientId) => {
+  const handleClientNameClick = async (e, clientId) => {
+    // If Ctrl key (or Cmd on Mac) is pressed, allow natural browser behavior
+    if (e.ctrlKey || e.metaKey) {
+      // Mark the latest note as viewed (async, don't wait)
+      const client = clients.find(c => c._id === clientId);
+      if (client && client.notes && client.notes.length > 0) {
+        const latestNote = client.notes[0];
+        markNoteAsViewed(clientId, latestNote._id); // Fire and forget
+      }
+      // Don't prevent default - let browser open link in background tab naturally
+      return;
+    }
+    
+    // For normal click, prevent default and show context menu
     e.preventDefault();
     setContextMenu({
       show: true,
@@ -2230,12 +2243,13 @@ const ClientManagement = () => {
                             {getInitials(client.firstName, client.lastName || '')}
                           </div>
                           <div className="ml-2 lg:ml-3">
-                            <button
+                            <a
+                              href={`/clients/${client._id}`}
                               onClick={(e) => handleClientNameClick(e, client._id)}
-                              className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline"
+                              className="text-xs lg:text-sm font-medium text-blue-600 hover:text-blue-900 hover:underline cursor-pointer"
                             >
                               {client.firstName}
-                            </button>
+                            </a>
                           </div>
                         </div>
                       </td>
