@@ -110,6 +110,10 @@ const ReportsAnalytics = () => {
         return 'bg-purple-100 text-purple-800';
       case 'Wrong Number':
         return 'bg-red-100 text-red-800';
+      case 'Wrong Name':
+        return 'bg-amber-100 text-amber-800';
+      case 'Perfilado':
+        return 'bg-cyan-100 text-cyan-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -620,6 +624,8 @@ const ReportsAnalytics = () => {
                   <option value="Not Interested">Not Interested</option>
                   <option value="Hang Up">Hang Up</option>
                   <option value="Wrong Number">Wrong Number</option>
+                  <option value="Wrong Name">Wrong Name</option>
+                  <option value="Perfilado">Perfilado</option>
                 </select>
               </div>
             </div>

@@ -174,6 +174,8 @@ const ClientManagement = () => {
         return 'bg-red-100 text-red-800';
       case 'Wrong Name':
         return 'bg-amber-100 text-amber-800';
+      case 'Perfilado':
+        return 'bg-cyan-100 text-cyan-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -193,7 +195,7 @@ const ClientManagement = () => {
         return 'bg-orange-100 text-orange-800';
       case 'Affiliate':
         return 'bg-teal-100 text-teal-800';
-      case 'camping No Interest Rete':
+      case 'not campaign':
         return 'bg-red-100 text-red-800';
       case 'DataR':
         return 'bg-indigo-200 text-indigo-900';
@@ -1263,7 +1265,7 @@ const ClientManagement = () => {
   // Calculate dynamic analytics from current clients (which are already filtered by the API)
   const calculateDynamicAnalytics = () => {
     // Define all possible campaign types
-    const allCampaigns = ['Data', 'Affiliate', 'Data2', 'Data3', 'camping No Interest Rete', 'DataR', 'Data2R', 'AffiliateR'];
+    const allCampaigns = ['Data', 'Affiliate', 'Data2', 'Data3', 'not campaign', 'DataR', 'Data2R', 'AffiliateR'];
     
     // Calculate clients by campaign from current clients
     const campaignCounts = {};
@@ -1317,7 +1319,7 @@ const ClientManagement = () => {
         return '#8B5CF6'; // Purple
       case 'Data3':
         return '#EC4899'; // Pink
-      case 'camping No Interest Rete':
+      case 'not campaign':
         return '#EF4444'; // Red
       case 'DataR':
         return '#4338CA'; // Dark Indigo
@@ -1926,7 +1928,7 @@ const ClientManagement = () => {
                             </button>
                             {[
                               'New Lead', 'FTD', 'FTD RETENTION', 'Call Again', 'No Answer', 
-                              'NA5UP', 'Not Interested', 'Hang Up', 'Wrong Number', 'Wrong Name'
+                              'NA5UP', 'Not Interested', 'Hang Up', 'Wrong Number', 'Wrong Name', 'Perfilado'
                             ].map((status) => (
                               <button
                                 key={status}
@@ -2005,7 +2007,7 @@ const ClientManagement = () => {
                             </button>
                             {[
                               'Data', 'Data2', 'Data3', 'Data4', 'Data5', 'Affiliate', 
-                              'camping No Interest Rete', 'DataR', 'Data2R', 'AffiliateR'
+                              'not campaign', 'DataR', 'Data2R', 'AffiliateR'
                             ].map((campaign) => (
                               <button
                                 key={campaign}
@@ -2036,7 +2038,7 @@ const ClientManagement = () => {
                                   campaign === 'Data4' ? 'bg-yellow-500' :
                                   campaign === 'Data5' ? 'bg-orange-500' :
                                   campaign === 'Affiliate' ? 'bg-teal-500' :
-                                  campaign === 'camping No Interest Rete' ? 'bg-red-500' :
+                                  campaign === 'not campaign' ? 'bg-red-500' :
                                   campaign === 'DataR' ? 'bg-indigo-600' :
                                   campaign === 'Data2R' ? 'bg-purple-600' :
                                   campaign === 'AffiliateR' ? 'bg-teal-600' :
@@ -2775,7 +2777,7 @@ const ClientManagement = () => {
                   <option value="Affiliate">Affiliate</option>
                   <option value="Data2">Data2</option>
                   <option value="Data3">Data3</option>
-                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
                   <option value="AffiliateR">AffiliateR</option>
@@ -2903,7 +2905,7 @@ const ClientManagement = () => {
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
-                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
                   <option value="AffiliateR">AffiliateR</option>
@@ -3011,7 +3013,7 @@ const ClientManagement = () => {
                             client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                             client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
                             client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
-                            client.campaign === 'camping No Interest Rete' ? 'bg-red-100 text-red-800' :
+                            client.campaign === 'not campaign' ? 'bg-red-100 text-red-800' :
                             client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
                             client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
                             client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
@@ -3251,6 +3253,7 @@ const ClientManagement = () => {
                   <option value="Hang Up">Hang Up</option>
                   <option value="Wrong Number">Wrong Number</option>
                   <option value="Wrong Name">Wrong Name</option>
+                  <option value="Perfilado">Perfilado</option>
                 </select>
               </div>
               <div>
@@ -3266,7 +3269,7 @@ const ClientManagement = () => {
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
-                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
                   <option value="AffiliateR">AffiliateR</option>

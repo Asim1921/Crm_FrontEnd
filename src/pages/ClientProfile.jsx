@@ -549,6 +549,8 @@ const ClientProfile = () => {
         return 'bg-red-100 text-red-800';
       case 'Wrong Name':
         return 'bg-red-100 text-red-800';
+      case 'Perfilado':
+        return 'bg-cyan-100 text-cyan-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
       case 'pending':
@@ -670,6 +672,7 @@ const ClientProfile = () => {
                   <option value="Hang Up">Hang Up</option>
                   <option value="Wrong Number">Wrong Number</option>
                   <option value="Wrong Name">Wrong Name</option>
+                  <option value="Perfilado">Perfilado</option>
                 </select>
               </div>
 
@@ -687,7 +690,7 @@ const ClientProfile = () => {
                       client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                       client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
                       client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
-                      client.campaign === 'camping No Interest Rete' ? 'bg-red-100 text-red-800' :
+                      client.campaign === 'not campaign' ? 'bg-red-100 text-red-800' :
                       client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
                       client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
                       client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
@@ -700,7 +703,7 @@ const ClientProfile = () => {
                     <option value="Data4">Data4</option>
                     <option value="Data5">Data5</option>
                     <option value="Affiliate">Affiliate</option>
-                    <option value="camping No Interest Rete">camping No Interest Rete</option>
+                    <option value="not campaign">not campaign</option>
                     <option value="DataR">DataR</option>
                     <option value="Data2R">Data2R</option>
                     <option value="AffiliateR">AffiliateR</option>
@@ -713,7 +716,7 @@ const ClientProfile = () => {
                     client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                     client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
                     client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
-                    client.campaign === 'camping No Interest Rete' ? 'bg-red-100 text-red-800' :
+                    client.campaign === 'not campaign' ? 'bg-red-100 text-red-800' :
                     client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
                     client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
                     client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
@@ -1042,6 +1045,7 @@ const ClientProfile = () => {
                         <option value="Hang Up">Hang Up</option>
                         <option value="Wrong Number">Wrong Number</option>
                         <option value="Wrong Name">Wrong Name</option>
+                        <option value="Perfilado">Perfilado</option>
                       </select>
                     </div>
                     <div>
@@ -1309,7 +1313,7 @@ const ClientProfile = () => {
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
                   <option value="Affiliate">Affiliate</option>
-                  <option value="camping No Interest Rete">camping No Interest Rete</option>
+                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
                   <option value="AffiliateR">AffiliateR</option>

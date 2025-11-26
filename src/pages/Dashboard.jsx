@@ -1280,6 +1280,8 @@ const Dashboard = () => {
                 <option value="Not Interested">Not Interested</option>
                 <option value="Hang Up">Hang Up</option>
                 <option value="Wrong Number">Wrong Number</option>
+                <option value="Wrong Name">Wrong Name</option>
+                <option value="Perfilado">Perfilado</option>
               </select>
             </div>
             <div className="flex justify-end space-x-3">
