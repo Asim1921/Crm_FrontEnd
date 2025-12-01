@@ -20,7 +20,7 @@ const Login = () => {
 
   const handleLogin = async (formData) => {
     try {
-      await login(formData.username, formData.password);
+      await login(formData.email, formData.password);
       setToast({
         message: 'Login successful! Welcome back.',
         type: 'success'

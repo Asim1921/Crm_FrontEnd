@@ -114,6 +114,8 @@ const ReportsAnalytics = () => {
         return 'bg-amber-100 text-amber-800';
       case 'Perfilado':
         return 'bg-cyan-100 text-cyan-800';
+      case 'campaign no interest':
+        return 'bg-rose-100 text-rose-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -626,6 +628,7 @@ const ReportsAnalytics = () => {
                   <option value="Wrong Number">Wrong Number</option>
                   <option value="Wrong Name">Wrong Name</option>
                   <option value="Perfilado">Perfilado</option>
+                  <option value="campaign no interest">campaign no interest</option>
                 </select>
               </div>
             </div>

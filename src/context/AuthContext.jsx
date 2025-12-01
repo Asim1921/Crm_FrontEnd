@@ -108,7 +108,13 @@ export const AuthProvider = ({ children }) => {
         body: JSON.stringify({ email, password })
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        // If response is not JSON, create a default error message
+        throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+      }
 
       if (response.ok) {
         dispatch({
@@ -131,9 +137,10 @@ export const AuthProvider = ({ children }) => {
         
         return { success: true };
       } else {
-        throw new Error(data.message || 'Login failed');
+        throw new Error(data.message || 'Invalid credentials');
       }
     } catch (error) {
+      console.error('Login error:', error);
       throw new Error(error.message || 'Network error');
     }
   };

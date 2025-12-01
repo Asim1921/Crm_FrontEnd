@@ -3,7 +3,7 @@ import { LogIn, ArrowRight } from 'lucide-react';
 
 const LoginModal = ({ isOpen, onClose, onLogin }) => {
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -39,16 +39,16 @@ const LoginModal = ({ isOpen, onClose, onLogin }) => {
 
         {/* Title */}
         <h2 className="text-xl lg:text-2xl font-bold text-gray-900 text-center mb-2">Login</h2>
-        <p className="text-sm lg:text-base text-gray-600 text-center mb-6 lg:mb-8">Login with username and Password</p>
+        <p className="text-sm lg:text-base text-gray-600 text-center mb-6 lg:mb-8">Login with email and Password</p>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-6">
           <div>
             <input
-              type="text"
-              name="username"
-              placeholder="username"
-              value={formData.username}
+              type="email"
+              name="email"
+              placeholder="Email"
+              value={formData.email}
               onChange={handleChange}
               disabled={isLoading}
               className="w-full px-3 lg:px-4 py-2 lg:py-3 text-sm lg:text-base border border-gray-300 rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
