@@ -69,6 +69,8 @@ const ClientManagement = () => {
   const [showDateOptionsDropdown, setShowDateOptionsDropdown] = useState(false);
   const [dateSortType, setDateSortType] = useState('entry'); // 'entry' or 'comment'
   const [showSelectAllDropdown, setShowSelectAllDropdown] = useState(false);
+  const [campaignListPage, setCampaignListPage] = useState(1);
+  const campaignsPerPage = 5;
   const statusFilterRef = useRef(null);
   const campaignFilterRef = useRef(null);
   const selectAllDropdownRef = useRef(null);
@@ -176,7 +178,7 @@ const ClientManagement = () => {
         return 'bg-amber-100 text-amber-800';
       case 'Perfilado':
         return 'bg-cyan-100 text-cyan-800';
-      case 'campaign no interest':
+      case 'no interest rete':
         return 'bg-rose-100 text-rose-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -195,14 +197,38 @@ const ClientManagement = () => {
         return 'bg-yellow-100 text-yellow-800';
       case 'Data5':
         return 'bg-orange-100 text-orange-800';
+      case 'data 6':
+        return 'bg-blue-100 text-blue-800';
+      case 'data 7':
+        return 'bg-cyan-100 text-cyan-800';
+      case 'data 8':
+        return 'bg-emerald-100 text-emerald-800';
+      case 'data 9':
+        return 'bg-lime-100 text-lime-800';
+      case 'data10':
+        return 'bg-amber-100 text-amber-800';
       case 'Affiliate':
         return 'bg-teal-100 text-teal-800';
-      case 'not campaign':
-        return 'bg-red-100 text-red-800';
       case 'DataR':
         return 'bg-indigo-200 text-indigo-900';
       case 'Data2R':
         return 'bg-purple-200 text-purple-900';
+      case 'data 3 R':
+        return 'bg-pink-200 text-pink-900';
+      case 'Data4R':
+        return 'bg-yellow-200 text-yellow-900';
+      case 'Data5R':
+        return 'bg-orange-200 text-orange-900';
+      case 'Data6R':
+        return 'bg-blue-200 text-blue-900';
+      case 'Data7R':
+        return 'bg-cyan-200 text-cyan-900';
+      case 'Data8R':
+        return 'bg-emerald-200 text-emerald-900';
+      case 'Data9R':
+        return 'bg-lime-200 text-lime-900';
+      case 'Data10R':
+        return 'bg-amber-200 text-amber-900';
       case 'AffiliateR':
         return 'bg-teal-200 text-teal-900';
       default:
@@ -429,6 +455,7 @@ const ClientManagement = () => {
       }
     });
     setCurrentPage(1);
+    setCampaignListPage(1); // Reset campaign list pagination
   };
 
   // Handle select all clients across all pages
@@ -1267,7 +1294,7 @@ const ClientManagement = () => {
   // Calculate dynamic analytics from current clients (which are already filtered by the API)
   const calculateDynamicAnalytics = () => {
     // Define all possible campaign types
-    const allCampaigns = ['Data', 'Affiliate', 'Data2', 'Data3', 'not campaign', 'DataR', 'Data2R', 'AffiliateR'];
+    const allCampaigns = ['Data', 'Data2', 'Data3', 'Data4', 'Data5', 'data 6', 'data 7', 'data 8', 'data 9', 'data10', 'Affiliate', 'DataR', 'Data2R', 'data 3 R', 'Data4R', 'Data5R', 'Data6R', 'Data7R', 'Data8R', 'Data9R', 'Data10R', 'AffiliateR'];
     
     // Calculate clients by campaign from current clients
     const campaignCounts = {};
@@ -1321,12 +1348,40 @@ const ClientManagement = () => {
         return '#8B5CF6'; // Purple
       case 'Data3':
         return '#EC4899'; // Pink
-      case 'not campaign':
-        return '#EF4444'; // Red
+      case 'Data4':
+        return '#EAB308'; // Yellow
+      case 'Data5':
+        return '#F97316'; // Orange
+      case 'data 6':
+        return '#3B82F6'; // Blue
+      case 'data 7':
+        return '#06B6D4'; // Cyan
+      case 'data 8':
+        return '#10B981'; // Emerald
+      case 'data 9':
+        return '#84CC16'; // Lime
+      case 'data10':
+        return '#F59E0B'; // Amber
       case 'DataR':
         return '#4338CA'; // Dark Indigo
       case 'Data2R':
         return '#7C3AED'; // Dark Purple
+      case 'data 3 R':
+        return '#DB2777'; // Dark Pink
+      case 'Data4R':
+        return '#CA8A04'; // Dark Yellow
+      case 'Data5R':
+        return '#EA580C'; // Dark Orange
+      case 'Data6R':
+        return '#2563EB'; // Dark Blue
+      case 'Data7R':
+        return '#0891B2'; // Dark Cyan
+      case 'Data8R':
+        return '#059669'; // Dark Emerald
+      case 'Data9R':
+        return '#65A30D'; // Dark Lime
+      case 'Data10R':
+        return '#D97706'; // Dark Amber
       case 'AffiliateR':
         return '#059669'; // Dark Emerald
       default:
@@ -1733,8 +1788,8 @@ const ClientManagement = () => {
             </div>
           </div>
           
-          <div className="overflow-x-auto" style={{ direction: 'rtl' }}>
-            <table className="w-full min-w-[800px]" style={{ direction: 'ltr' }}>
+          <div className="overflow-x-auto -mx-4 lg:-mx-6 px-4 lg:px-6" style={{ direction: 'rtl' }}>
+            <table className="w-full min-w-[1200px]" style={{ direction: 'ltr' }}>
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 lg:px-6 py-3 text-left">
@@ -1747,7 +1802,7 @@ const ClientManagement = () => {
                   </th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CLIENT NAME</th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative overflow-visible">
                     <div className="relative" ref={countryHeaderDropdownRef}>
                       <button
                         onClick={toggleCountryHeaderDropdown}
@@ -1760,7 +1815,7 @@ const ClientManagement = () => {
                       </button>
                       
                       {showCountryHeaderDropdown && (
-                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] max-h-60 overflow-y-auto" style={{ position: 'absolute' }}>
                           <div className="py-1">
                             <button
                               onClick={() => {
@@ -1823,7 +1878,7 @@ const ClientManagement = () => {
                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">EMAIL</th>
                    )}
                   {(isAdmin(user) || isTeamLeader(user)) && (
-                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative overflow-visible">
                       <div className="relative" ref={agentHeaderDropdownRef}>
                         <button
                           onClick={toggleAgentHeaderDropdown}
@@ -1836,7 +1891,7 @@ const ClientManagement = () => {
                         </button>
                         
                         {showAgentHeaderDropdown && (
-                          <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          <div className="absolute top-full left-0 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] max-h-60 overflow-y-auto" style={{ position: 'absolute' }}>
                             <div className="py-1">
                               <button
                                 onClick={() => {
@@ -1896,7 +1951,7 @@ const ClientManagement = () => {
                       </div>
                     </th>
                   )}
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative overflow-visible">
                     <div className="relative" ref={statusHeaderDropdownRef}>
                       <button
                         onClick={toggleStatusHeaderDropdown}
@@ -1909,7 +1964,7 @@ const ClientManagement = () => {
                       </button>
                       
                       {showStatusHeaderDropdown && (
-                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] max-h-60 overflow-y-auto" style={{ position: 'absolute' }}>
                           <div className="py-1">
                             <button
                               onClick={() => {
@@ -1930,7 +1985,7 @@ const ClientManagement = () => {
                             </button>
                             {[
                               'New Lead', 'FTD', 'FTD RETENTION', 'Call Again', 'No Answer', 
-                              'NA5UP', 'Not Interested', 'Hang Up', 'Wrong Number', 'Wrong Name', 'Perfilado', 'campaign no interest'
+                              'NA5UP', 'Not Interested', 'Hang Up', 'Wrong Number', 'Wrong Name', 'Perfilado', 'no interest rete'
                             ].map((status) => (
                               <button
                                 key={status}
@@ -1975,7 +2030,7 @@ const ClientManagement = () => {
                       )}
                     </div>
                   </th>
-                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider relative overflow-visible">
                     <div className="relative" ref={campaignHeaderDropdownRef}>
                       <button
                         onClick={toggleCampaignHeaderDropdown}
@@ -1988,7 +2043,7 @@ const ClientManagement = () => {
                       </button>
                       
                       {showCampaignHeaderDropdown && (
-                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                        <div className="absolute top-full left-0 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-[100] max-h-60 overflow-y-auto" style={{ position: 'absolute' }}>
                           <div className="py-1">
                             <button
                               onClick={() => {
@@ -2008,8 +2063,8 @@ const ClientManagement = () => {
                               <span>All Campaigns</span>
                             </button>
                             {[
-                              'Data', 'Data2', 'Data3', 'Data4', 'Data5', 'Affiliate', 
-                              'not campaign', 'DataR', 'Data2R', 'AffiliateR'
+                              'Data', 'Data2', 'Data3', 'Data4', 'Data5', 'data 6', 'data 7', 'data 8', 'data 9', 'data10', 'Affiliate', 
+                              'DataR', 'Data2R', 'data 3 R', 'Data4R', 'Data5R', 'Data6R', 'Data7R', 'Data8R', 'Data9R', 'Data10R', 'AffiliateR'
                             ].map((campaign) => (
                               <button
                                 key={campaign}
@@ -2039,10 +2094,22 @@ const ClientManagement = () => {
                                   campaign === 'Data3' ? 'bg-pink-500' :
                                   campaign === 'Data4' ? 'bg-yellow-500' :
                                   campaign === 'Data5' ? 'bg-orange-500' :
+                                  campaign === 'data 6' ? 'bg-blue-500' :
+                                  campaign === 'data 7' ? 'bg-cyan-500' :
+                                  campaign === 'data 8' ? 'bg-emerald-500' :
+                                  campaign === 'data 9' ? 'bg-lime-500' :
+                                  campaign === 'data10' ? 'bg-amber-500' :
                                   campaign === 'Affiliate' ? 'bg-teal-500' :
-                                  campaign === 'not campaign' ? 'bg-red-500' :
                                   campaign === 'DataR' ? 'bg-indigo-600' :
                                   campaign === 'Data2R' ? 'bg-purple-600' :
+                                  campaign === 'data 3 R' ? 'bg-pink-600' :
+                                  campaign === 'Data4R' ? 'bg-yellow-600' :
+                                  campaign === 'Data5R' ? 'bg-orange-600' :
+                                  campaign === 'Data6R' ? 'bg-blue-600' :
+                                  campaign === 'Data7R' ? 'bg-cyan-600' :
+                                  campaign === 'Data8R' ? 'bg-emerald-600' :
+                                  campaign === 'Data9R' ? 'bg-lime-600' :
+                                  campaign === 'Data10R' ? 'bg-amber-600' :
                                   campaign === 'AffiliateR' ? 'bg-teal-600' :
                                   'bg-gray-400'
                                 }`}></div>
@@ -2198,7 +2265,7 @@ const ClientManagement = () => {
               <tbody className="bg-white divide-y divide-gray-200">
                 {clients.length === 0 ? (
                   <tr>
-                    <td colSpan="100%" className="px-4 lg:px-6 py-12 text-center">
+                    <td colSpan={8 + (canViewPhoneNumbers(user) ? 1 : 0) + (canViewEmailAddresses(user) ? 1 : 0) + ((isAdmin(user) || isTeamLeader(user)) ? 1 : 0)} className="px-4 lg:px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center space-y-3">
                         <Users className="w-12 h-12 text-gray-400" />
                         <div className="text-gray-500">
@@ -2491,7 +2558,10 @@ const ClientManagement = () => {
               </div>
               {campaignFilter.length > 0 && (
                 <button
-                  onClick={() => setCampaignFilter([])}
+                  onClick={() => {
+                    setCampaignFilter([]);
+                    setCampaignListPage(1);
+                  }}
                   className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                 >
                   Clear Filter
@@ -2528,12 +2598,15 @@ const ClientManagement = () => {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  <div className="w-1/3 pl-4">
-                    <div className="space-y-2">
+                  <div className="w-1/3 pl-4 flex flex-col">
+                    <div className="space-y-2 flex-1 overflow-hidden">
                       {campaignFilter.length > 0 && (
                         <div 
                           className="flex items-center justify-between cursor-pointer p-2 rounded-lg transition-colors hover:bg-gray-50"
-                          onClick={() => setCampaignFilter([])}
+                          onClick={() => {
+                            setCampaignFilter([]);
+                            setCampaignListPage(1);
+                          }}
                         >
                           <div className="flex items-center">
                             <div className="w-3 h-3 rounded-full mr-3 bg-gray-400"></div>
@@ -2544,30 +2617,66 @@ const ClientManagement = () => {
                           </span>
                         </div>
                       )}
-                      {dynamicAnalytics.clientsByCampaign.map((item) => (
-                        <div 
-                          key={item._id} 
-                          className={`flex items-center justify-between text-sm cursor-pointer p-2 rounded-lg transition-colors ${
-                            campaignFilter.includes(item._id) 
-                              ? 'bg-blue-50 border border-blue-200' 
-                              : 'hover:bg-gray-50'
-                          }`}
-                          onClick={() => handleCampaignClick(item._id)}
-                        >
-                          <div className="flex items-center">
-                            <div 
-                              className="w-3 h-3 rounded-full mr-2" 
-                              style={{ backgroundColor: getCampaignChartColor(item._id) }}
-                            ></div>
-                            <span className={`${campaignFilter === item._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
-                              {item._id}
-                            </span>
-                          </div>
-                          <span className={`font-medium ${campaignFilter === item._id ? 'text-blue-700' : 'text-gray-900'}`}>
-                            {item.count}
-                          </span>
-                        </div>
-                      ))}
+                      {(() => {
+                        const startIndex = (campaignListPage - 1) * campaignsPerPage;
+                        const endIndex = startIndex + campaignsPerPage;
+                        const paginatedCampaigns = dynamicAnalytics.clientsByCampaign.slice(startIndex, endIndex);
+                        const totalPages = Math.ceil(dynamicAnalytics.clientsByCampaign.length / campaignsPerPage);
+                        
+                        return (
+                          <>
+                            <div className="space-y-2">
+                              {paginatedCampaigns.map((item) => (
+                                <div 
+                                  key={item._id} 
+                                  className={`flex items-center justify-between text-sm cursor-pointer p-2 rounded-lg transition-colors ${
+                                    campaignFilter.includes(item._id) 
+                                      ? 'bg-blue-50 border border-blue-200' 
+                                      : 'hover:bg-gray-50'
+                                  }`}
+                                  onClick={() => handleCampaignClick(item._id)}
+                                >
+                                  <div className="flex items-center min-w-0 flex-1">
+                                    <div 
+                                      className="w-3 h-3 rounded-full mr-2 flex-shrink-0" 
+                                      style={{ backgroundColor: getCampaignChartColor(item._id) }}
+                                    ></div>
+                                    <span className={`truncate ${campaignFilter === item._id ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                                      {item._id}
+                                    </span>
+                                  </div>
+                                  <span className={`font-medium flex-shrink-0 ml-2 ${campaignFilter === item._id ? 'text-blue-700' : 'text-gray-900'}`}>
+                                    {item.count}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200">
+                                <button
+                                  onClick={() => setCampaignListPage(prev => Math.max(1, prev - 1))}
+                                  disabled={campaignListPage === 1}
+                                  className={`p-1 rounded ${campaignListPage === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
+                                  title="Previous page"
+                                >
+                                  <ChevronLeft className="w-4 h-4" />
+                                </button>
+                                <span className="text-xs text-gray-600">
+                                  Page {campaignListPage} of {totalPages}
+                                </span>
+                                <button
+                                  onClick={() => setCampaignListPage(prev => Math.min(totalPages, prev + 1))}
+                                  disabled={campaignListPage === totalPages}
+                                  className={`p-1 rounded ${campaignListPage === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'}`}
+                                  title="Next page"
+                                >
+                                  <ChevronRight className="w-4 h-4" />
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -2779,9 +2888,23 @@ const ClientManagement = () => {
                   <option value="Affiliate">Affiliate</option>
                   <option value="Data2">Data2</option>
                   <option value="Data3">Data3</option>
-                  <option value="not campaign">not campaign</option>
+                  <option value="Data4">Data4</option>
+                  <option value="Data5">Data5</option>
+                  <option value="data 6">data 6</option>
+                  <option value="data 7">data 7</option>
+                  <option value="data 8">data 8</option>
+                  <option value="data 9">data 9</option>
+                  <option value="data10">data10</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
+                  <option value="data 3 R">data 3 R</option>
+                  <option value="Data4R">Data4R</option>
+                  <option value="Data5R">Data5R</option>
+                  <option value="Data6R">Data6R</option>
+                  <option value="Data7R">Data7R</option>
+                  <option value="Data8R">Data8R</option>
+                  <option value="Data9R">Data9R</option>
+                  <option value="Data10R">Data10R</option>
                   <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
@@ -2906,10 +3029,22 @@ const ClientManagement = () => {
                   <option value="Data3">Data3</option>
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
+                  <option value="data 6">data 6</option>
+                  <option value="data 7">data 7</option>
+                  <option value="data 8">data 8</option>
+                  <option value="data 9">data 9</option>
+                  <option value="data10">data10</option>
                   <option value="Affiliate">Affiliate</option>
-                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
+                  <option value="data 3 R">data 3 R</option>
+                  <option value="Data4R">Data4R</option>
+                  <option value="Data5R">Data5R</option>
+                  <option value="Data6R">Data6R</option>
+                  <option value="Data7R">Data7R</option>
+                  <option value="Data8R">Data8R</option>
+                  <option value="Data9R">Data9R</option>
+                  <option value="Data10R">Data10R</option>
                   <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
@@ -3014,10 +3149,22 @@ const ClientManagement = () => {
                             client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                             client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                             client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
+                            client.campaign === 'data 6' ? 'bg-blue-100 text-blue-800' :
+                            client.campaign === 'data 7' ? 'bg-cyan-100 text-cyan-800' :
+                            client.campaign === 'data 8' ? 'bg-emerald-100 text-emerald-800' :
+                            client.campaign === 'data 9' ? 'bg-lime-100 text-lime-800' :
+                            client.campaign === 'data10' ? 'bg-amber-100 text-amber-800' :
                             client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
-                            client.campaign === 'not campaign' ? 'bg-red-100 text-red-800' :
                             client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
                             client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                            client.campaign === 'data 3 R' ? 'bg-pink-200 text-pink-900' :
+                            client.campaign === 'Data4R' ? 'bg-yellow-200 text-yellow-900' :
+                            client.campaign === 'Data5R' ? 'bg-orange-200 text-orange-900' :
+                            client.campaign === 'Data6R' ? 'bg-blue-200 text-blue-900' :
+                            client.campaign === 'Data7R' ? 'bg-cyan-200 text-cyan-900' :
+                            client.campaign === 'Data8R' ? 'bg-emerald-200 text-emerald-900' :
+                            client.campaign === 'Data9R' ? 'bg-lime-200 text-lime-900' :
+                            client.campaign === 'Data10R' ? 'bg-amber-200 text-amber-900' :
                             client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                             'bg-gray-100 text-gray-800'
                           }`}>
@@ -3256,7 +3403,7 @@ const ClientManagement = () => {
                   <option value="Wrong Number">Wrong Number</option>
                   <option value="Wrong Name">Wrong Name</option>
                   <option value="Perfilado">Perfilado</option>
-                  <option value="campaign no interest">campaign no interest</option>
+                  <option value="no interest rete">no interest rete</option>
                 </select>
               </div>
               <div>
@@ -3271,10 +3418,22 @@ const ClientManagement = () => {
                   <option value="Data3">Data3</option>
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
+                  <option value="data 6">data 6</option>
+                  <option value="data 7">data 7</option>
+                  <option value="data 8">data 8</option>
+                  <option value="data 9">data 9</option>
+                  <option value="data10">data10</option>
                   <option value="Affiliate">Affiliate</option>
-                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
+                  <option value="data 3 R">data 3 R</option>
+                  <option value="Data4R">Data4R</option>
+                  <option value="Data5R">Data5R</option>
+                  <option value="Data6R">Data6R</option>
+                  <option value="Data7R">Data7R</option>
+                  <option value="Data8R">Data8R</option>
+                  <option value="Data9R">Data9R</option>
+                  <option value="Data10R">Data10R</option>
                   <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>

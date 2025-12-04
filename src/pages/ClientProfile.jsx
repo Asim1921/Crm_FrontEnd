@@ -551,7 +551,7 @@ const ClientProfile = () => {
         return 'bg-red-100 text-red-800';
       case 'Perfilado':
         return 'bg-cyan-100 text-cyan-800';
-      case 'campaign no interest':
+      case 'no interest rete':
         return 'bg-rose-100 text-rose-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
@@ -675,7 +675,7 @@ const ClientProfile = () => {
                   <option value="Wrong Number">Wrong Number</option>
                   <option value="Wrong Name">Wrong Name</option>
                   <option value="Perfilado">Perfilado</option>
-                  <option value="campaign no interest">campaign no interest</option>
+                  <option value="no interest rete">no interest rete</option>
                 </select>
               </div>
 
@@ -692,10 +692,22 @@ const ClientProfile = () => {
                       client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                       client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                       client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
+                      client.campaign === 'data 6' ? 'bg-blue-100 text-blue-800' :
+                      client.campaign === 'data 7' ? 'bg-cyan-100 text-cyan-800' :
+                      client.campaign === 'data 8' ? 'bg-emerald-100 text-emerald-800' :
+                      client.campaign === 'data 9' ? 'bg-lime-100 text-lime-800' :
+                      client.campaign === 'data10' ? 'bg-amber-100 text-amber-800' :
                       client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
-                      client.campaign === 'not campaign' ? 'bg-red-100 text-red-800' :
                       client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
                       client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                      client.campaign === 'data 3 R' ? 'bg-pink-200 text-pink-900' :
+                      client.campaign === 'Data4R' ? 'bg-yellow-200 text-yellow-900' :
+                      client.campaign === 'Data5R' ? 'bg-orange-200 text-orange-900' :
+                      client.campaign === 'Data6R' ? 'bg-blue-200 text-blue-900' :
+                      client.campaign === 'Data7R' ? 'bg-cyan-200 text-cyan-900' :
+                      client.campaign === 'Data8R' ? 'bg-emerald-200 text-emerald-900' :
+                      client.campaign === 'Data9R' ? 'bg-lime-200 text-lime-900' :
+                      client.campaign === 'Data10R' ? 'bg-amber-200 text-amber-900' :
                       client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                       'bg-gray-100 text-gray-800'
                     }`}
@@ -705,10 +717,22 @@ const ClientProfile = () => {
                     <option value="Data3">Data3</option>
                     <option value="Data4">Data4</option>
                     <option value="Data5">Data5</option>
+                    <option value="data 6">data 6</option>
+                    <option value="data 7">data 7</option>
+                    <option value="data 8">data 8</option>
+                    <option value="data 9">data 9</option>
+                    <option value="data10">data10</option>
                     <option value="Affiliate">Affiliate</option>
-                    <option value="not campaign">not campaign</option>
                     <option value="DataR">DataR</option>
                     <option value="Data2R">Data2R</option>
+                    <option value="data 3 R">data 3 R</option>
+                    <option value="Data4R">Data4R</option>
+                    <option value="Data5R">Data5R</option>
+                    <option value="Data6R">Data6R</option>
+                    <option value="Data7R">Data7R</option>
+                    <option value="Data8R">Data8R</option>
+                    <option value="Data9R">Data9R</option>
+                    <option value="Data10R">Data10R</option>
                     <option value="AffiliateR">AffiliateR</option>
                   </select>
                 ) : (
@@ -718,10 +742,22 @@ const ClientProfile = () => {
                     client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                     client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                     client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
+                    client.campaign === 'data 6' ? 'bg-blue-100 text-blue-800' :
+                    client.campaign === 'data 7' ? 'bg-cyan-100 text-cyan-800' :
+                    client.campaign === 'data 8' ? 'bg-emerald-100 text-emerald-800' :
+                    client.campaign === 'data 9' ? 'bg-lime-100 text-lime-800' :
+                    client.campaign === 'data10' ? 'bg-amber-100 text-amber-800' :
                     client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
-                    client.campaign === 'not campaign' ? 'bg-red-100 text-red-800' :
                     client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
                     client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                    client.campaign === 'data 3 R' ? 'bg-pink-200 text-pink-900' :
+                    client.campaign === 'Data4R' ? 'bg-yellow-200 text-yellow-900' :
+                    client.campaign === 'Data5R' ? 'bg-orange-200 text-orange-900' :
+                    client.campaign === 'Data6R' ? 'bg-blue-200 text-blue-900' :
+                    client.campaign === 'Data7R' ? 'bg-cyan-200 text-cyan-900' :
+                    client.campaign === 'Data8R' ? 'bg-emerald-200 text-emerald-900' :
+                    client.campaign === 'Data9R' ? 'bg-lime-200 text-lime-900' :
+                    client.campaign === 'Data10R' ? 'bg-amber-200 text-amber-900' :
                     client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                     'bg-gray-100 text-gray-800'
                   }`}>
@@ -1049,7 +1085,7 @@ const ClientProfile = () => {
                         <option value="Wrong Number">Wrong Number</option>
                         <option value="Wrong Name">Wrong Name</option>
                         <option value="Perfilado">Perfilado</option>
-                        <option value="campaign no interest">campaign no interest</option>
+                        <option value="no interest rete">no interest rete</option>
                       </select>
                     </div>
                     <div>
@@ -1316,10 +1352,22 @@ const ClientProfile = () => {
                   <option value="Data3">Data3</option>
                   <option value="Data4">Data4</option>
                   <option value="Data5">Data5</option>
+                  <option value="data 6">data 6</option>
+                  <option value="data 7">data 7</option>
+                  <option value="data 8">data 8</option>
+                  <option value="data 9">data 9</option>
+                  <option value="data10">data10</option>
                   <option value="Affiliate">Affiliate</option>
-                  <option value="not campaign">not campaign</option>
                   <option value="DataR">DataR</option>
                   <option value="Data2R">Data2R</option>
+                  <option value="data 3 R">data 3 R</option>
+                  <option value="Data4R">Data4R</option>
+                  <option value="Data5R">Data5R</option>
+                  <option value="Data6R">Data6R</option>
+                  <option value="Data7R">Data7R</option>
+                  <option value="Data8R">Data8R</option>
+                  <option value="Data9R">Data9R</option>
+                  <option value="Data10R">Data10R</option>
                   <option value="AffiliateR">AffiliateR</option>
                 </select>
               </div>
@@ -1375,7 +1423,23 @@ const ClientProfile = () => {
                             client.campaign === 'Data3' ? 'bg-pink-100 text-pink-800' :
                             client.campaign === 'Data4' ? 'bg-yellow-100 text-yellow-800' :
                             client.campaign === 'Data5' ? 'bg-orange-100 text-orange-800' :
-                            client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' : 
+                            client.campaign === 'data 6' ? 'bg-blue-100 text-blue-800' :
+                            client.campaign === 'data 7' ? 'bg-cyan-100 text-cyan-800' :
+                            client.campaign === 'data 8' ? 'bg-emerald-100 text-emerald-800' :
+                            client.campaign === 'data 9' ? 'bg-lime-100 text-lime-800' :
+                            client.campaign === 'data10' ? 'bg-amber-100 text-amber-800' :
+                            client.campaign === 'Affiliate' ? 'bg-teal-100 text-teal-800' :
+                            client.campaign === 'DataR' ? 'bg-indigo-200 text-indigo-900' :
+                            client.campaign === 'Data2R' ? 'bg-purple-200 text-purple-900' :
+                            client.campaign === 'data 3 R' ? 'bg-pink-200 text-pink-900' :
+                            client.campaign === 'Data4R' ? 'bg-yellow-200 text-yellow-900' :
+                            client.campaign === 'Data5R' ? 'bg-orange-200 text-orange-900' :
+                            client.campaign === 'Data6R' ? 'bg-blue-200 text-blue-900' :
+                            client.campaign === 'Data7R' ? 'bg-cyan-200 text-cyan-900' :
+                            client.campaign === 'Data8R' ? 'bg-emerald-200 text-emerald-900' :
+                            client.campaign === 'Data9R' ? 'bg-lime-200 text-lime-900' :
+                            client.campaign === 'Data10R' ? 'bg-amber-200 text-amber-900' :
+                            client.campaign === 'AffiliateR' ? 'bg-teal-200 text-teal-900' :
                             'bg-gray-100 text-gray-800'
                           }`}>
                             {client.campaign || 'Data'}

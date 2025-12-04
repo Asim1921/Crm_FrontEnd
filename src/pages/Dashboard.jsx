@@ -1282,7 +1282,7 @@ const Dashboard = () => {
                 <option value="Wrong Number">Wrong Number</option>
                 <option value="Wrong Name">Wrong Name</option>
                 <option value="Perfilado">Perfilado</option>
-                <option value="campaign no interest">campaign no interest</option>
+                <option value="no interest rete">no interest rete</option>
               </select>
             </div>
             <div className="flex justify-end space-x-3">
